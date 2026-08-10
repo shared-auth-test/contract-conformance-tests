@@ -94,7 +94,13 @@ jobs:
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --ignore-scripts --no-audit --no-fund
           node scripts/vendor-htmx.mjs
-          find static -type f -iname '*htmx*' -size +100c -print -quit | grep -q .
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = 'static/vendor/htmx.min.js';
+          const bytes = fs.statSync(path).size;
+          if (bytes < 100) throw new Error(`vendored htmx asset too small: ${bytes}`);
+          console.log(`vendored htmx bytes=${bytes}`);
+          NODE
       - name: Generate the exact Cargo lock and inspect metadata
         working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
