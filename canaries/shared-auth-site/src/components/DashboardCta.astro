@@ -1,0 +1,11 @@
+---
+interface Props { href?: string }
+const { href = "/dashboard/" } = Astro.props;
+---
+<a class="dashboard-cta" href={href} aria-label="Open the Shared Auth dashboard handoff">
+  <span><b>Dashboard</b><small>Users · sessions · roles</small></span>
+  <i aria-hidden="true">→</i>
+</a>
+<style>
+.dashboard-cta{display:inline-flex;gap:.9rem;align-items:center;justify-content:space-between;min-width:15rem;padding:.8rem 1rem;border:1px solid #0f172a18;border-radius:.9rem;background:var(--ink);color:white;text-decoration:none;box-shadow:0 14px 34px #0f172a20;transition:transform .16s ease,box-shadow .16s ease}.dashboard-cta:hover{transform:translateY(-2px);box-shadow:0 18px 42px #0f172a2b}.dashboard-cta span{display:grid;text-align:left}.dashboard-cta b{font-size:.92rem}.dashboard-cta small{color:#cbd5e1;font-size:.68rem;font-weight:650}.dashboard-cta i{font-size:1.1rem;font-style:normal}@media(prefers-reduced-motion:reduce){.dashboard-cta{transition:none}.dashboard-cta:hover{transform:none}}
+</style>
