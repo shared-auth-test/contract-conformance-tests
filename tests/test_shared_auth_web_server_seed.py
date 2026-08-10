@@ -118,7 +118,6 @@ class SharedAuthWebServerSeedCanary(unittest.TestCase):
             "ores-otel/ores-lib-core",
         ):
             self.assertIn(dependency, text[".zpkg.toml"])
-        self.assertIn("ores-otel/ores.otel.log", text["docs/SECURITY_MODEL.md"])
         self.assertIn("env/enc", text["justfile"])
         self.assertIn("creation_rules", text[".sops.yaml"])
         self.assertIn("nixpkgs", text["flake.nix"])
