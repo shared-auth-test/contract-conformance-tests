@@ -39,6 +39,11 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         self.assertRegex(
             self.manifest["webServerSeedArchiveSha256"], r"^[0-9a-f]{64}$"
         )
+        evidence = self.manifest["firstPassEvidence"]
+        self.assertRegex(evidence["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertRegex(evidence["generatedLockSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(evidence["lockfileVersion"], 3)
+        self.assertEqual(evidence["resolvedAstro"], "5.18.2")
         for relative, expected in self.manifest["sourceBlobs"].items():
             path = ROOT / relative
             self.assertTrue(path.is_file(), relative)
@@ -143,7 +148,7 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
 
     def test_astro_handoff_is_static_and_fail_closed(self) -> None:
         package = read_json(SITE / "package.json")
-        self.assertEqual(package["dependencies"], {"astro": "^5.13.2"})
+        self.assertEqual(package["dependencies"], {"astro": "5.18.2"})
         self.assertEqual(package["scripts"]["build"], "astro build")
         self.assertTrue((SITE / "public/.nojekyll").is_file())
         for forbidden in ("_config.yml", "Gemfile", "config.toml", "hugo.toml"):
@@ -160,6 +165,23 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         cta = (SITE / "src/components/DashboardCta.astro").read_text(encoding="utf-8")
         self.assertIn("Users · sessions · roles", cta)
         self.assertIn('href = "/dashboard/"', cta)
+
+    def test_pages_workflow_is_immutable_and_least_privilege(self) -> None:
+        workflow = (SITE / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("npm install --package-lock-only --ignore-scripts", workflow)
+        self.assertLess(workflow.index("npm install --package-lock-only"), workflow.index("npm ci"))
+        self.assertIn("pages: write\n      id-token: write", workflow)
+        actions = [
+            line.split("uses:", 1)[1].strip()
+            for line in workflow.splitlines()
+            if "uses:" in line
+        ]
+        self.assertEqual(len(actions), 4)
+        for action in actions:
+            self.assertRegex(action, r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$")
+        self.assertNotRegex(workflow, r"uses:\s+[^\n]+@v[0-9]")
 
     def test_fixture_tree_contains_no_credential_shapes(self) -> None:
         credential = re.compile(
