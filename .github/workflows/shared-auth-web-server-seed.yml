@@ -23,7 +23,6 @@ concurrency:
 
 env:
   BUNDLE: canaries/shared-auth-web-server-seed
-  MATERIALIZED: ${{ runner.temp }}/shared-auth-web-server.js
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: '1'
 
@@ -40,9 +39,9 @@ jobs:
           python3 -m compileall -q tests/test_shared_auth_web_server_seed.py "$BUNDLE/materialize.py"
           python3 -m unittest discover -s tests -p 'test_shared_auth_web_server_seed.py' -v
       - name: Materialize the exact 38-file source tree
-        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+        run: python3 "$BUNDLE/materialize.py" "$RUNNER_TEMP/shared-auth-web-server.js"
       - name: Run source policy and syntax checks
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           python3 scripts/check.py
@@ -71,9 +70,9 @@ jobs:
           node-version: '22'
           cache: ''
       - name: Materialize exact source
-        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+        run: python3 "$BUNDLE/materialize.py" "$RUNNER_TEMP/shared-auth-web-server.js"
       - name: Select and install the declared Rust toolchain
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           toolchain="$(python3 - <<'PY'
@@ -89,7 +88,7 @@ jobs:
           rustc -vV
           cargo -vV
       - name: Resolve and vendor htmx without lifecycle scripts
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
@@ -97,7 +96,7 @@ jobs:
           node scripts/vendor-htmx.mjs
           find static -type f -iname '*htmx*' -size +100c -print -quit | grep -q .
       - name: Generate the exact Cargo lock and inspect metadata
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           cargo fmt --all -- --check
@@ -106,7 +105,7 @@ jobs:
           cargo tree --locked --duplicates > cargo-tree-duplicates.txt
           sha256sum Cargo.lock package-lock.json > dependency-lock-sha256.txt
       - name: Compile, test, lint, and build release
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           cargo check --locked --all-targets
@@ -114,7 +113,7 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           cargo build --locked --release
       - name: Compile optional Leptos and Dioxus adapters independently
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -131,7 +130,7 @@ jobs:
             cargo check --locked --all-targets --features "$feature"
           done
       - name: Record release evidence
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           find target/release -maxdepth 1 -type f -perm -111 -print0 \
@@ -143,12 +142,12 @@ jobs:
         with:
           name: shared-auth-web-server-seed-67a3b513
           path: |
-            ${{ env.MATERIALIZED }}/Cargo.lock
-            ${{ env.MATERIALIZED }}/package-lock.json
-            ${{ env.MATERIALIZED }}/dependency-lock-sha256.txt
-            ${{ env.MATERIALIZED }}/cargo-metadata.json
-            ${{ env.MATERIALIZED }}/cargo-tree-duplicates.txt
-            ${{ env.MATERIALIZED }}/release-sha256.txt
+            ${{ runner.temp }}/shared-auth-web-server.js/Cargo.lock
+            ${{ runner.temp }}/shared-auth-web-server.js/package-lock.json
+            ${{ runner.temp }}/shared-auth-web-server.js/dependency-lock-sha256.txt
+            ${{ runner.temp }}/shared-auth-web-server.js/cargo-metadata.json
+            ${{ runner.temp }}/shared-auth-web-server.js/cargo-tree-duplicates.txt
+            ${{ runner.temp }}/shared-auth-web-server.js/release-sha256.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -162,9 +161,9 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342
       - name: Materialize exact source
-        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+        run: python3 "$BUNDLE/materialize.py" "$RUNNER_TEMP/shared-auth-web-server.js"
       - name: Evaluate the Nix flake without writing a lock
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           nix --version
@@ -172,7 +171,7 @@ jobs:
           nix flake check --no-build --no-write-lock-file .
           nix develop --no-write-lock-file --command just --list
       - name: Exercise real ephemeral SOPS plus age encryption and decryption
-        working-directory: ${{ env.MATERIALIZED }}
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
         run: |
           set -euo pipefail
           nix develop --no-write-lock-file --command bash -s <<'BASH'
