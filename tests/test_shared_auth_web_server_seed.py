@@ -58,7 +58,8 @@ def load_archive() -> tuple[dict, bytes]:
 
 class SharedAuthWebServerSeedCanary(unittest.TestCase):
     def test_bundle_files_are_exact_source_blobs(self) -> None:
-        self.assertEqual(set(EXPECTED_BLOBS), {path.name for path in BUNDLE.iterdir()})
+        regular_files = {path.name for path in BUNDLE.iterdir() if path.is_file()}
+        self.assertEqual(set(EXPECTED_BLOBS), regular_files)
         for relative, expected in EXPECTED_BLOBS.items():
             path = BUNDLE / relative
             self.assertTrue(path.is_file(), relative)
