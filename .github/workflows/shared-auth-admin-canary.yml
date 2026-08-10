@@ -1,0 +1,83 @@
+name: Shared Auth admin stack canary
+
+on:
+  pull_request:
+    paths:
+      - canaries/shared-auth-site/**
+      - fixtures/shared-auth-admin/**
+      - tests/test_shared_auth_admin_stack.py
+      - .github/workflows/shared-auth-admin-canary.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-auth-admin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Compile canary test
+        run: python3 -m compileall -q tests/test_shared_auth_admin_stack.py
+      - name: Verify exact-source contracts and boundaries
+        run: python3 -m unittest discover -s tests -p 'test_shared_auth_admin_stack.py' -v
+      - name: Preserve repository policy
+        run: python3 scripts/verify_repository.py
+
+  astro:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: ''
+      - name: Resolve the missing lockfile without lifecycle scripts
+        working-directory: canaries/shared-auth-site
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install from the generated exact lock
+        working-directory: canaries/shared-auth-site
+        run: npm ci --no-audit --no-fund
+      - name: Build Astro static site
+        working-directory: canaries/shared-auth-site
+        run: npm run build
+      - name: Run source PR regression tests
+        working-directory: canaries/shared-auth-site
+        run: npm test
+      - name: Verify lock and static-only output
+        working-directory: canaries/shared-auth-site
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          if (lock.lockfileVersion !== 3) throw new Error(`unexpected lockfileVersion ${lock.lockfileVersion}`);
+          if (lock.packages?.['']?.dependencies?.astro !== '5.18.2') throw new Error('root Astro pin drift');
+          if (lock.packages?.['node_modules/astro']?.version !== '5.18.2') throw new Error('resolved Astro version drift');
+          NODE
+          test -f dist/index.html
+          test -f dist/dashboard/index.html
+          test -f public/.nojekyll
+          test ! -e _config.yml
+          test ! -e Gemfile
+          test ! -e config.toml
+          test ! -e hugo.toml
+      - name: Upload generated lock and build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shared-auth-astro-lock-580fb272
+          path: |
+            canaries/shared-auth-site/package-lock.json
+            canaries/shared-auth-site/dist
+          if-no-files-found: error
+          retention-days: 1

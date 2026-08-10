@@ -1,0 +1,61 @@
+---
+import ClientShowcase from "../components/ClientShowcase.astro";
+const features=[
+ ["Protected introspection","Attach an independent service credential only to the introspection endpoint and fail locally when it is missing."],
+ ["Token exchange","Turn provider identity into one verified shared-auth contract instead of provider-specific assumptions."],
+ ["MFA and 3FA","Compose email, SMS, TOTP import, and factor enrollment through typed ceremonies."],
+ ["Passkey ceremonies","Relay opaque WebAuthn credential JSON and never accept raw fingerprint or face templates."],
+ ["Credential-safe transport","Redirect refusal, bounded bodies, path validation, and redacted errors span the client matrix."],
+ ["Generated identity types","Keep interfaces, guard logic, and transports separate so clients cannot redefine identity semantics."],
+];
+const samples=[
+ {id:"rust",label:"Rust",file:"assurance.rs",code:`let auth = SharedAuthClient::new(
+    "https://gateway.example/shared-auth",
+).with_service_credential(
+    std::env::var("SHARED_AUTH_INTROSPECT_SECRET")?,
+);
+
+let identity = auth.introspect(access_token).await?;
+if !identity.has_acr("urn:oresoftware:loa:2") {
+    anyhow::bail!("step-up authentication required");
+}`,note:"The service credential is sent only to /auth/introspect, never to exchange or factor requests."},
+ {id:"typescript",label:"TypeScript",file:"assurance.ts",code:`const auth = new SharedAuthClient(
+  "https://gateway.example/shared-auth",
+).withServiceCredential(
+  process.env.SHARED_AUTH_INTROSPECT_SECRET,
+);
+
+const identity = await auth.introspect(accessToken);
+if (!identity.acr.includes("urn:oresoftware:loa:2")) {
+  throw new Error("step-up authentication required");
+}`,note:"TypeScript follows the same two-credential boundary and fails closed for sensitive operations."},
+ {id:"dart",label:"Dart / Flutter",file:"assurance.dart",code:`final auth = SharedAuthClient(
+  'https://gateway.example/shared-auth',
+).withServiceCredential(introspectionSecret);
+
+final identity = await auth.introspect(accessToken);
+if (!identity.hasAcr('urn:oresoftware:loa:2')) {
+  throw StateError('step-up authentication required');
+}`,note:"The Dart package carries factor and passkey operations for mobile and web hosts."},
+ {id:"swift",label:"Swift",file:"Assurance.swift",code:`let auth = try SharedAuthClient(
+  baseURL: "https://gateway.example/shared-auth",
+  serviceCredential: ProcessInfo.processInfo.environment[
+    "SHARED_AUTH_INTROSPECT_SECRET"
+  ]
+)
+
+let identity = try await auth.introspect(accessToken)
+guard identity.hasACR("urn:oresoftware:loa:2") else {
+  throw AssuranceError.stepUpRequired
+}`,note:"Swift models WebAuthn credentials as opaque JSON so platform authenticators remain the biometric boundary."},
+];
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A shared identity plane for token exchange, protected introspection, MFA, passkeys, and explicit assurance."><meta name="theme-color" content="#0b1020"><title>Shared Auth — identity with explicit assurance</title></head><body>
+<header><a class="brand" href="/"><b>A</b> Shared Auth</a><nav><a href="#platform">Platform</a><a href="#clients">Clients</a><a href="https://github.com/shared-auth">GitHub ↗</a></nav></header>
+<main><section class="hero"><div><p class="eyebrow">Identity plane · Assurance-aware</p><h1>One identity boundary. <em>No implicit trust.</em></h1><p class="lede">Shared Auth centralizes token exchange, introspection, factor enrollment, OTP challenges, and WebAuthn ceremonies while keeping service credentials and end-user tokens in separate lanes.</p><div class="actions"><a class="primary" href="https://github.com/shared-auth">Explore the identity plane ↗</a><a href="#clients">See client code</a></div><ul><li>Protected introspection</li><li>Passkeys without biometric custody</li><li>Polyglot SDK matrix</li></ul></div><div class="visual"><span class="mesh"></span><div class="lane lane-user"><small>USER LANE</small><b>provider token</b><i>exchange → identity</i></div><div class="lane lane-service"><small>SERVICE LANE</small><b>introspection secret</b><i>introspect only</i></div><div class="core"><small>ASSURANCE</small><strong>explicit ACR</strong><span>Authentication is not authorization.</span></div><div class="chip c1">EXCHANGE<b>ES256</b></div><div class="chip c2">FACTORS<b>MFA</b></div><div class="chip c3">PASSKEYS<b>WebAuthn</b></div><div class="chip c4">GATEWAY<b>verified</b></div></div></section>
+<section class="metrics"><div><b>10+</b><span>client runtime slices</span></div><div><b>2</b><span>credential lanes</span></div><div><b>0</b><span>raw biometric templates</span></div><div><b>1</b><span>assurance contract</span></div></section>
+<section id="platform" class="platform"><p class="eyebrow">Identity infrastructure</p><h2>Make every trust transition visible.</h2><p class="intro">Exchange, verification, protected introspection, factor ceremonies, and application guard logic remain separate. Services can demand an assurance level without conflating identity with tenant or resource authorization.</p><div class="features">{features.map(([title,body],index)=><article><small>{String(index+1).padStart(2,"0")}</small><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+<div id="clients"><ClientShowcase title="Enforce assurance from native, web, mobile, BEAM, or JVM code." description="The official clients cover exchange, authenticated introspection, verification, JWKS, factors, OTP, and passkeys. These examples demonstrate the deliberate separation between service and end-user credentials." source="https://github.com/shared-auth/shared-auth-clients" samples={samples}/></div>
+<section class="flow"><div><p class="eyebrow">Separate lanes</p><h2>User identity and service authority never blur together.</h2></div><div class="steps"><span>provider token</span><b>→</b><span>exchange</span><b>→</b><span>shared identity</span><b>→</b><span>introspection</span><b>→</b><span>app authorization</span></div><p>Shared Auth proves identity and assurance. Applications still own tenant, role, and resource authorization.</p></section>
+<section class="closing"><p class="eyebrow">Trust should be inspectable</p><h2>Give every application one hardened identity plane.</h2><p>Explore the interfaces, guard library, client matrix, gateway, and 3FA-compatible factor flows.</p><a href="https://github.com/shared-auth">Open the organization ↗</a></section></main><footer><span>© 2026 Shared Auth</span><a href="https://github.com/shared-auth/shared-auth-clients">Client packages</a></footer></body></html>
+<style is:global>:root{--accent:#6d5dfc;--hot:#0ea5e9;--ink:#0b1020;--muted:#5f6b7c;--paper:#f6f7ff}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;overflow-x:hidden;background:linear-gradient(180deg,#eef2ff,var(--paper) 34rem);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,sans-serif}a{color:inherit}header,main,footer{width:min(1180px,calc(100% - 2rem));margin:auto}header{display:flex;justify-content:space-between;align-items:center;padding:1.1rem 0}.brand{font-weight:900;text-decoration:none}.brand b{display:inline-grid;width:2.2rem;aspect-ratio:1;place-items:center;margin-right:.5rem;border-radius:.7rem;background:var(--ink);color:white}nav{display:flex;gap:1.3rem;font-size:.88rem;font-weight:750}nav a{text-decoration:none}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(2rem,7vw,7rem);align-items:center;min-height:720px;padding:5rem 0}.eyebrow{margin:0;color:var(--accent);font:800 .72rem/1 ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase}h1{max-width:12ch;margin:.8rem 0 1.3rem;font-size:clamp(3.4rem,8vw,7rem);line-height:.86;letter-spacing:-.075em}h1 em{background:linear-gradient(120deg,var(--accent),var(--hot));background-clip:text;color:transparent;font-style:normal}.lede,.intro{max-width:46rem;color:var(--muted);font-size:1.12rem}.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2rem 0}.actions a,.closing a{padding:.75rem 1.05rem;border:1px solid #0f172a18;border-radius:.8rem;font-weight:800;text-decoration:none}.actions .primary{background:var(--ink);color:white}.hero ul{display:flex;flex-wrap:wrap;gap:1rem;margin:0;padding:0;color:var(--muted);font-size:.82rem;list-style:none}.hero li:before{content:'◆';margin-right:.4rem;color:var(--accent)}.visual{position:relative;min-height:31rem;overflow:hidden;border-radius:2rem;background:radial-gradient(circle at 50% 48%,#6d5dfc45,transparent 38%),linear-gradient(145deg,#070c19,#141e38);box-shadow:0 35px 90px #0f172a42}.mesh{position:absolute;inset:0;background-image:linear-gradient(#ffffff0d 1px,transparent 1px),linear-gradient(90deg,#ffffff0d 1px,transparent 1px);background-size:2.3rem 2.3rem}.lane,.core,.chip{position:absolute;border:1px solid #ffffff20;background:#0f172bcc;color:white;backdrop-filter:blur(14px)}.lane{display:grid;width:11rem;padding:.85rem;border-radius:.9rem}.lane small,.core small,.chip{font:700 .62rem/1.4 ui-monospace,monospace;letter-spacing:.09em}.lane i{color:#94a3b8;font-size:.72rem;font-style:normal}.lane-user{top:8%;left:7%}.lane-service{top:8%;right:7%}.core{top:50%;left:50%;display:grid;width:13.5rem;padding:1.2rem;border-radius:1.2rem;transform:translate(-50%,-50%)}.core strong{margin:.4rem 0;font-size:1.35rem}.core span{color:#94a3b8;font-size:.8rem}.chip{display:grid;min-width:8rem;padding:.75rem;border-radius:.9rem;color:#94a3b8}.chip b{color:white}.c1{bottom:11%;left:6%}.c2{bottom:13%;left:31%}.c3{bottom:13%;right:28%}.c4{right:6%;bottom:9%}.metrics{display:grid;grid-template-columns:repeat(4,1fr);overflow:hidden;border:1px solid #0f172a16;border-radius:1.2rem;background:#ffffffb8;box-shadow:0 20px 55px #0f172a10}.metrics div{display:grid;padding:1.2rem}.metrics div+div{border-left:1px solid #0f172a16}.metrics b{font-size:1.35rem}.metrics span{color:var(--muted);font-size:.78rem}.platform{padding:8rem 0}.platform h2,.flow h2,.closing h2{max-width:15ch;margin:.6rem 0 1rem;font-size:clamp(2.6rem,6vw,5rem);line-height:.94;letter-spacing:-.06em}.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:3rem}.features article{min-height:15rem;padding:1.3rem;border:1px solid #0f172a14;border-radius:1.2rem;background:#ffffffc4}.features small{color:var(--accent);font:800 .7rem/1 ui-monospace,monospace}.features h3{margin:2.4rem 0 .6rem;font-size:1.25rem}.features p{color:var(--muted)}.flow{display:grid;grid-template-columns:.8fr 1.2fr;gap:2rem 4rem;align-items:end;margin:9rem 0;padding:clamp(2rem,6vw,5rem);border-radius:1.7rem;background:#0b1020;color:white}.flow .eyebrow{color:#a5b4fc}.flow>p{grid-column:2;margin:0;color:#94a3b8}.steps{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}.steps span{padding:.65rem .8rem;border:1px solid #ffffff20;border-radius:.65rem;background:#ffffff0b;font:650 .75rem/1 ui-monospace,monospace}.steps b{color:#818cf8}.closing{margin-bottom:2rem;padding:clamp(2rem,7vw,6rem);border-radius:2rem;background:linear-gradient(125deg,var(--accent),var(--hot));color:white}.closing .eyebrow{color:#ffffffc4}.closing a{display:inline-block;margin-top:1rem;background:white;color:var(--ink)}footer{display:flex;justify-content:flex-end;gap:1.5rem;padding:1.5rem 0 3rem;color:var(--muted);font-size:.8rem}footer span{margin-right:auto}footer a{text-decoration:none}@media(max-width:900px){.hero{grid-template-columns:1fr;min-height:auto}.features{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}.flow>p{grid-column:1}}@media(max-width:650px){nav a:not(:last-child){display:none}.visual{min-height:27rem}.metrics{grid-template-columns:1fr 1fr}.features{grid-template-columns:1fr}.c2,.c3{display:none}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}</style>
