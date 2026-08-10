@@ -1,0 +1,249 @@
+{
+  "schema": "shared-auth/repository-seed/v1",
+  "repository": "shared-auth/shared-auth-web-server.js",
+  "source_files": [
+    {
+      "path": ".env.example",
+      "sha256": "0b7ada6f292e0be8a0e87e7cd968fc8d95e9fdcaa1f6a9dd0447f66615a1bead",
+      "bytes": 457,
+      "mode": "644"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "e93a54d8aa1d191397719df831f45e80b4b409bca772a6f0ea523ca7633a3a3e",
+      "bytes": 1291,
+      "mode": "644"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "3d82121b03ff1a231d409276ea0be3e539756f0a734de2febc1d4671a6d13284",
+      "bytes": 142,
+      "mode": "644"
+    },
+    {
+      "path": ".sops.yaml",
+      "sha256": "655e0f8893ba7c264435928c4fd7888ff07674c392ae0bf5acb09eb239ae77a7",
+      "bytes": 166,
+      "mode": "644"
+    },
+    {
+      "path": ".zpkg.toml",
+      "sha256": "39d6132b734c88f79dc79a227d2c93b1bae066e3374539aa632cb293ebea4280",
+      "bytes": 995,
+      "mode": "644"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "ff5399746ee999adc30fc01f9996e8716aa0ece2907a72c15a76bf4dd97157d0",
+      "bytes": 2170,
+      "mode": "644"
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "6eb0aca4514acc185ca2656a5dbe24afd303c7e9805aba1ba381f4db299952f6",
+      "bytes": 773,
+      "mode": "644"
+    },
+    {
+      "path": "README.md",
+      "sha256": "e81d17acaedf7986201aaab5f148281405e3d1172d7b607e97dd023ff411396b",
+      "bytes": 4657,
+      "mode": "644"
+    },
+    {
+      "path": "config/capability-baseline.json",
+      "sha256": "8e973961d2521de25bec470e6a8ef894a490873e9455c7dcf97270bbf5fc8964",
+      "bytes": 2363,
+      "mode": "644"
+    },
+    {
+      "path": "deploy/k8s/deployment.yaml",
+      "sha256": "d2a006f4936c05d2f9c405270e5de9ca09de311f6c2df4037262d38feb782ed7",
+      "bytes": 1897,
+      "mode": "644"
+    },
+    {
+      "path": "docs/CAPABILITY_MATRIX.md",
+      "sha256": "92155a41b95ced0e568bde558fa3e7b18312d77e462b4230796faee539484943",
+      "bytes": 1000,
+      "mode": "644"
+    },
+    {
+      "path": "docs/DATA_SYNC.md",
+      "sha256": "1f90200fb267f535491646ffe44118aec6d045ac739c2a68ca45925fe8c1a964",
+      "bytes": 985,
+      "mode": "644"
+    },
+    {
+      "path": "docs/SECURITY_MODEL.md",
+      "sha256": "4a43bfc05f808ac1fd6b50bbff228f894de8243891a091099132ace7e3d9929e",
+      "bytes": 2435,
+      "mode": "644"
+    },
+    {
+      "path": "env/dec/README.md",
+      "sha256": "8a5977842aac5026583a61b3d44eba59eabb9394f62012652ce5a02d76f3898e",
+      "bytes": 201,
+      "mode": "644"
+    },
+    {
+      "path": "env/enc/README.md",
+      "sha256": "8d9e3383ddf057f19bbd791a102e18e5e81c6c7a750dce8a571fd17765f86ca3",
+      "bytes": 351,
+      "mode": "644"
+    },
+    {
+      "path": "flake.nix",
+      "sha256": "5d4a407c5d46fa8b5eab943d271739271f4563dc5716f3c4401a18a0b0e7869f",
+      "bytes": 979,
+      "mode": "644"
+    },
+    {
+      "path": "justfile",
+      "sha256": "d93f28caf6dc2eec92cdea1ad7c21519e1a018a47e49d512881d11115da2fa83",
+      "bytes": 1468,
+      "mode": "644"
+    },
+    {
+      "path": "migrations/0001_directory.sql",
+      "sha256": "dcf0a280b5f6b9ec76b5b1fab83f1a7b2700be38de1fe5a06eb989df5c10eaa2",
+      "bytes": 4218,
+      "mode": "644"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e05af9215316fbb0717c3e3320f7c33d7820561f0565faf2cd5dff8d167199a6",
+      "bytes": 204,
+      "mode": "644"
+    },
+    {
+      "path": "repository.json",
+      "sha256": "22cd7572ac931fd921d9c224673b5ec5544bc7c91d7635f5989faebddc60f8c8",
+      "bytes": 688,
+      "mode": "644"
+    },
+    {
+      "path": "scripts/check.py",
+      "sha256": "31b42fe2d14bd92b9ebe2a7a4a1f2ff7c7eb15d17c48b0711db1f992f6de8733",
+      "bytes": 3354,
+      "mode": "755"
+    },
+    {
+      "path": "scripts/env_to_sops.py",
+      "sha256": "cecf73745c0b9bdae6c6c6e0ebb41deb9737479cdfbbc3a9542e0b0195a6ea8f",
+      "bytes": 1013,
+      "mode": "755"
+    },
+    {
+      "path": "scripts/link-zed-dependencies.sh",
+      "sha256": "a487dc277f1d10076ef7495c6407f20b57860692cb50ab78bc9ca726e5e77c23",
+      "bytes": 750,
+      "mode": "755"
+    },
+    {
+      "path": "scripts/provision-repository.sh",
+      "sha256": "65deb20af506931ae6b648060ae9478098a5647951771a64fb3610c366d76f8a",
+      "bytes": 2647,
+      "mode": "755"
+    },
+    {
+      "path": "scripts/sops_to_env.py",
+      "sha256": "ec0d0536e266cba77f8c0626f599f0353d88100274c19f63ee9c5c07aaa60704",
+      "bytes": 949,
+      "mode": "755"
+    },
+    {
+      "path": "scripts/vendor-htmx.mjs",
+      "sha256": "ccca3712c3ba389f5a7e0d3278a5ba9f75511738c0f11ab1655284fb163075bc",
+      "bytes": 630,
+      "mode": "644"
+    },
+    {
+      "path": "src/auth.rs",
+      "sha256": "d2d281cf5b3263a7eec395c6d66501f7dc1d9054abf1dd37640f5457dcb7df26",
+      "bytes": 4697,
+      "mode": "644"
+    },
+    {
+      "path": "src/capabilities.rs",
+      "sha256": "276e9f6fa03dc236de2292254dbaf1dac5cb9e52fce5a7374159c35103066115",
+      "bytes": 3258,
+      "mode": "644"
+    },
+    {
+      "path": "src/config.rs",
+      "sha256": "367482cb8830a73559265153cc1d7f48cd68ae7e12d0a6d00f12c0f073b5e411",
+      "bytes": 3618,
+      "mode": "644"
+    },
+    {
+      "path": "src/directory.rs",
+      "sha256": "626919a9b1e0af2279e672c07dba61fa527b461c0982e18cfea62a50ca2eaaef",
+      "bytes": 9172,
+      "mode": "644"
+    },
+    {
+      "path": "src/error.rs",
+      "sha256": "1b66ca7285075f1f28c0573caadcf3b01f43607228f996a85f286c8d8cb8d91d",
+      "bytes": 2258,
+      "mode": "644"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "4d7c3222b32f079930579110c5063dd538e9e62fb4b4a7b276f09ecbcf3e0799",
+      "bytes": 8859,
+      "mode": "644"
+    },
+    {
+      "path": "src/model.rs",
+      "sha256": "6457e8edeba639a6cf3d49a325475de66cb845c4cd01ccec0923f6874a5fc95a",
+      "bytes": 2312,
+      "mode": "644"
+    },
+    {
+      "path": "src/security.rs",
+      "sha256": "5be6308ecf7075b1605a4ea88150d73c85818199f81f0eb97c13953c6eb565ef",
+      "bytes": 1543,
+      "mode": "644"
+    },
+    {
+      "path": "src/telemetry.rs",
+      "sha256": "2006548e040952d7d4a34f6a0107da34fe7ddfe877349157977ff773ec4e2fa3",
+      "bytes": 1518,
+      "mode": "644"
+    },
+    {
+      "path": "src/ui.rs",
+      "sha256": "51ce81c6369e2265ca16ab618bd94defb7a76d6a484d889105023b152035855b",
+      "bytes": 715,
+      "mode": "644"
+    },
+    {
+      "path": "src/views.rs",
+      "sha256": "67ea2d7a5870479d959bf925c706d63ba19bc78ea2e4da093050675f9afbcce7",
+      "bytes": 10729,
+      "mode": "644"
+    },
+    {
+      "path": "static/app.css",
+      "sha256": "560dde8d938416aa99f94ced73d8c54e38e0fcf318eca654432116bc5d3432b0",
+      "bytes": 4059,
+      "mode": "644"
+    }
+  ],
+  "file_count": 38,
+  "uncompressed_bytes": 89521,
+  "validation": {
+    "policy": "python3 scripts/check.py",
+    "syntax": [
+      "bash -n scripts/*.sh",
+      "node --check scripts/vendor-htmx.mjs",
+      "python3 -m py_compile scripts/*.py"
+    ],
+    "rust": "not_run_runtime_has_no_rust_toolchain"
+  },
+  "archive_sha256": "095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848",
+  "archive_bytes": 26410,
+  "archive_parts": 9,
+  "archive_encoding": "base64-concatenated"
+}

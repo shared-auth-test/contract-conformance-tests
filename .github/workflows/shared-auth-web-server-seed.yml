@@ -1,0 +1,206 @@
+name: Shared Auth web server seed canary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - canaries/shared-auth-web-server-seed/**
+      - tests/test_shared_auth_web_server_seed.py
+      - .github/workflows/shared-auth-web-server-seed.yml
+  pull_request:
+    paths:
+      - canaries/shared-auth-web-server-seed/**
+      - tests/test_shared_auth_web_server_seed.py
+      - .github/workflows/shared-auth-web-server-seed.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-auth-web-server-seed-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUNDLE: canaries/shared-auth-web-server-seed
+  MATERIALIZED: ${{ runner.temp }}/shared-auth-web-server.js
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+
+jobs:
+  integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify exact Git blobs, archive, and embedded file digests
+        run: |
+          python3 -m compileall -q tests/test_shared_auth_web_server_seed.py "$BUNDLE/materialize.py"
+          python3 -m unittest discover -s tests -p 'test_shared_auth_web_server_seed.py' -v
+      - name: Materialize the exact 38-file source tree
+        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+      - name: Run source policy and syntax checks
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check.py
+          python3 -m compileall -q scripts
+          for script in scripts/*.sh; do bash -n "$script"; done
+          node --check scripts/vendor-htmx.mjs
+          test -f env/enc/README.md
+          test -f env/dec/README.md
+          if find env/dec -type f ! -name README.md -print -quit | grep -q .; then
+            echo 'plaintext env/dec material is forbidden' >&2
+            exit 1
+          fi
+      - name: Preserve test-repository policy
+        run: python3 scripts/verify_repository.py
+
+  build:
+    needs: integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: ''
+      - name: Materialize exact source
+        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+      - name: Select and install the declared Rust toolchain
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          toolchain="$(python3 - <<'PY'
+          import tomllib
+          with open('Cargo.toml', 'rb') as handle:
+              package = tomllib.load(handle).get('package', {})
+          print(package.get('rust-version', 'stable'))
+          PY
+          )"
+          echo "RUST_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+          rustup toolchain install "$toolchain" --profile minimal --component rustfmt,clippy
+          rustup override set "$toolchain"
+          rustc -vV
+          cargo -vV
+      - name: Resolve and vendor htmx without lifecycle scripts
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          node scripts/vendor-htmx.mjs
+          find static -type f -iname '*htmx*' -size +100c -print -quit | grep -q .
+      - name: Generate the exact Cargo lock and inspect metadata
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo generate-lockfile
+          cargo metadata --locked --format-version 1 --no-deps > cargo-metadata.json
+          cargo tree --locked --duplicates > cargo-tree-duplicates.txt
+          sha256sum Cargo.lock package-lock.json > dependency-lock-sha256.txt
+      - name: Compile, test, lint, and build release
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          cargo check --locked --all-targets
+          cargo test --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo build --locked --release
+      - name: Compile optional Leptos and Dioxus adapters independently
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import tomllib
+          with open('Cargo.toml', 'rb') as handle:
+              features = set(tomllib.load(handle).get('features', {}))
+          required = {'leptos-ssr', 'dioxus-ssr'}
+          missing = sorted(required - features)
+          if missing:
+              raise SystemExit(f'missing optional feature declarations: {missing}')
+          print(f'optional features present: {sorted(required)}')
+          PY
+          for feature in leptos-ssr dioxus-ssr; do
+            cargo check --locked --all-targets --features "$feature"
+          done
+      - name: Record release evidence
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          find target/release -maxdepth 1 -type f -perm -111 -print0 \
+            | sort -z \
+            | xargs -0 -r sha256sum > release-sha256.txt
+          test -s release-sha256.txt
+      - name: Upload generated locks and build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shared-auth-web-server-seed-67a3b513
+          path: |
+            ${{ env.MATERIALIZED }}/Cargo.lock
+            ${{ env.MATERIALIZED }}/package-lock.json
+            ${{ env.MATERIALIZED }}/dependency-lock-sha256.txt
+            ${{ env.MATERIALIZED }}/cargo-metadata.json
+            ${{ env.MATERIALIZED }}/cargo-tree-duplicates.txt
+            ${{ env.MATERIALIZED }}/release-sha256.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  nix-sops:
+    needs: integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342
+      - name: Materialize exact source
+        run: python3 "$BUNDLE/materialize.py" "$MATERIALIZED"
+      - name: Evaluate the Nix flake without writing a lock
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          nix --version
+          nix flake metadata --no-write-lock-file .
+          nix flake check --no-build --no-write-lock-file .
+          nix develop --no-write-lock-file --command just --list
+      - name: Exercise real ephemeral SOPS plus age encryption and decryption
+        working-directory: ${{ env.MATERIALIZED }}
+        run: |
+          set -euo pipefail
+          nix develop --no-write-lock-file --command bash -s <<'BASH'
+          set -euo pipefail
+          command -v sops
+          command -v age-keygen
+          command -v just
+          work="$RUNNER_TEMP/shared-auth-sops-canary"
+          rm -rf "$work"
+          mkdir -p "$work"
+          age-keygen -o "$work/key.txt" >/dev/null 2>&1
+          recipient="$(age-keygen -y "$work/key.txt")"
+          printf '{"canary":"not-a-production-secret"}\n' > "$work/plain.json"
+          sops --encrypt --age "$recipient" --input-type json --output-type json \
+            "$work/plain.json" > "$work/encrypted.json"
+          SOPS_AGE_KEY_FILE="$work/key.txt" \
+            sops --decrypt --input-type json --output-type json \
+            "$work/encrypted.json" > "$work/decrypted.json"
+          python3 - "$work/plain.json" "$work/decrypted.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding='utf-8') as left:
+              expected = json.load(left)
+          with open(sys.argv[2], encoding='utf-8') as right:
+              actual = json.load(right)
+          if actual != expected:
+              raise SystemExit(f'SOPS round trip mismatch: {actual!r}')
+          PY
+          grep -q '"sops"' "$work/encrypted.json"
+          rm -rf "$work"
+          BASH
