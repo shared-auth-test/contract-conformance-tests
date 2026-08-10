@@ -59,8 +59,8 @@ jobs:
           manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
           assert manifest['repository'] == 'shared-auth/shared-auth-web-server.js'
           assert manifest['archive_sha256'] == '095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848'
-          assert manifest['archive_part_count'] == 9
-          assert manifest['archive_compressed_bytes'] == 26410
+          assert manifest['archive_parts'] == 9
+          assert manifest['archive_bytes'] == 26410
           assert manifest['file_count'] == 38
           assert manifest['uncompressed_bytes'] == 89521
           print('exact seed manifest verified')
