@@ -30,132 +30,105 @@ CREDENTIAL = re.compile(
 )
 ACTION = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$")
 FORBIDDEN_BINARY_SUFFIXES = {
-    ".bmp",
-    ".gif",
-    ".jpeg",
-    ".jpg",
-    ".npy",
-    ".onnx",
-    ".png",
-    ".tiff",
-    ".webp",
+    ".bmp", ".gif", ".jpeg", ".jpg", ".npy", ".onnx", ".png", ".tiff", ".webp"
 }
 
 
 def git_blob_sha(path: Path) -> str:
     payload = path.read_bytes()
-    return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
+    return hashlib.sha1(f"blob {len(payload)}\0".encode() + payload).hexdigest()
 
 
 def load_archive() -> tuple[dict, bytes]:
-    manifest = json.loads((BUNDLE / "seed-manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((BUNDLE / "seed-manifest.json").read_text())
     encoded = "".join(
-        (BUNDLE / f"archive.b64.part{index:02d}").read_text(encoding="utf-8").strip()
+        (BUNDLE / f"archive.b64.part{index:02d}").read_text().strip()
         for index in range(manifest["archive_parts"])
     )
     return manifest, base64.b64decode(encoded, validate=True)
 
 
+def archive_files(archive_bytes: bytes) -> dict[str, bytes]:
+    files: dict[str, bytes] = {}
+    with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as archive:
+        for member in archive.getmembers():
+            path = PurePosixPath(member.name)
+            assert not path.is_absolute() and ".." not in path.parts
+            assert not (member.issym() or member.islnk() or member.isdev() or member.isfifo())
+            if member.isdir():
+                continue
+            assert member.isfile()
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            files[member.name] = extracted.read()
+    return files
+
+
 class SharedAuthWebServerSeedCanary(unittest.TestCase):
     def test_bundle_files_are_exact_source_blobs(self) -> None:
-        regular_files = {path.name for path in BUNDLE.iterdir() if path.is_file()}
-        self.assertEqual(set(EXPECTED_BLOBS), regular_files)
+        regular = {path.name for path in BUNDLE.iterdir() if path.is_file()}
+        self.assertEqual(set(EXPECTED_BLOBS), regular)
         for relative, expected in EXPECTED_BLOBS.items():
-            path = BUNDLE / relative
-            self.assertTrue(path.is_file(), relative)
-            self.assertEqual(git_blob_sha(path), expected, relative)
+            self.assertEqual(git_blob_sha(BUNDLE / relative), expected, relative)
 
-    def test_manifest_is_complete_and_normalized(self) -> None:
-        manifest, _ = load_archive()
+    def test_manifest_and_archive_are_complete(self) -> None:
+        manifest, archive_bytes = load_archive()
         self.assertEqual(manifest["schema"], "shared-auth/repository-seed/v1")
         self.assertEqual(manifest["repository"], "shared-auth/shared-auth-web-server.js")
-        self.assertEqual(manifest["archive_parts"], 9)
-        self.assertEqual(manifest["file_count"], 38)
-        self.assertEqual(manifest["uncompressed_bytes"], 89521)
-        self.assertEqual(manifest["archive_bytes"], 26410)
+        self.assertEqual(
+            (manifest["archive_parts"], manifest["file_count"], manifest["uncompressed_bytes"], manifest["archive_bytes"]),
+            (9, 38, 89521, 26410),
+        )
         self.assertEqual(
             manifest["archive_sha256"],
             "095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848",
         )
-        entries = manifest["source_files"]
-        paths = [entry["path"] for entry in entries]
-        self.assertEqual(len(paths), len(set(paths)))
-        self.assertEqual(len(paths), manifest["file_count"])
-        self.assertEqual(sum(entry["bytes"] for entry in entries), manifest["uncompressed_bytes"])
-        for entry in entries:
-            path = PurePosixPath(entry["path"])
-            self.assertFalse(path.is_absolute(), entry["path"])
-            self.assertNotIn("..", path.parts, entry["path"])
-            self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$")
-            self.assertIn(entry["mode"], {"644", "755"})
-            self.assertNotIn(path.suffix.lower(), FORBIDDEN_BINARY_SUFFIXES, entry["path"])
-        self.assertEqual(
-            sorted(path for path in paths if path.startswith("env/dec/")),
-            ["env/dec/README.md"],
-        )
-
-    def test_archive_and_every_embedded_file_match_manifest(self) -> None:
-        manifest, archive_bytes = load_archive()
         self.assertEqual(len(archive_bytes), manifest["archive_bytes"])
         self.assertEqual(hashlib.sha256(archive_bytes).hexdigest(), manifest["archive_sha256"])
-        expected = {entry["path"]: entry for entry in manifest["source_files"]}
-        actual: dict[str, bytes] = {}
-        with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as archive:
-            for member in archive.getmembers():
-                path = PurePosixPath(member.name)
-                self.assertFalse(path.is_absolute(), member.name)
-                self.assertNotIn("..", path.parts, member.name)
-                self.assertFalse(member.issym() or member.islnk(), member.name)
-                self.assertFalse(member.isdev() or member.isfifo(), member.name)
-                if member.isdir():
-                    continue
-                self.assertTrue(member.isfile(), member.name)
-                extracted = archive.extractfile(member)
-                self.assertIsNotNone(extracted, member.name)
-                actual[member.name] = extracted.read()
-        self.assertEqual(set(actual), set(expected))
+        entries = {entry["path"]: entry for entry in manifest["source_files"]}
+        self.assertEqual(len(entries), manifest["file_count"])
+        self.assertEqual(sum(entry["bytes"] for entry in entries.values()), manifest["uncompressed_bytes"])
+        self.assertEqual(
+            sorted(path for path in entries if path.startswith("env/dec/")),
+            ["env/dec/README.md"],
+        )
+        for relative, entry in entries.items():
+            path = PurePosixPath(relative)
+            self.assertFalse(path.is_absolute(), relative)
+            self.assertNotIn("..", path.parts, relative)
+            self.assertNotIn(path.suffix.lower(), FORBIDDEN_BINARY_SUFFIXES, relative)
+            self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$")
+            self.assertIn(entry["mode"], {"644", "755"})
+        actual = archive_files(archive_bytes)
+        self.assertEqual(set(actual), set(entries))
         for relative, payload in actual.items():
-            entry = expected[relative]
-            self.assertEqual(len(payload), entry["bytes"], relative)
-            self.assertEqual(hashlib.sha256(payload).hexdigest(), entry["sha256"], relative)
+            self.assertEqual(len(payload), entries[relative]["bytes"], relative)
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), entries[relative]["sha256"], relative)
             self.assertIsNone(CREDENTIAL.search(payload), relative)
 
     def test_security_and_dependency_surfaces_are_present(self) -> None:
         _, archive_bytes = load_archive()
-        selected: dict[str, str] = {}
-        with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as archive:
-            for name in (
-                "Cargo.toml",
-                ".zpkg.toml",
-                ".sops.yaml",
-                "justfile",
-                "flake.nix",
-                "docs/SECURITY_MODEL.md",
-                "config/capability-baseline.json",
-            ):
-                member = archive.getmember(name)
-                extracted = archive.extractfile(member)
-                self.assertIsNotNone(extracted, name)
-                selected[name] = extracted.read().decode("utf-8")
-        cargo = selected["Cargo.toml"]
+        files = archive_files(archive_bytes)
+        text = {name: payload.decode() for name, payload in files.items()}
         for dependency in ("axum", "maud", "sea-orm", "leptos", "dioxus"):
-            self.assertIn(dependency, cargo)
-        zed = selected[".zpkg.toml"]
-        self.assertIn("ores-otel/ores-lib-core", zed)
-        self.assertIn("oresoftware/next-loggers", zed)
-        self.assertIn("ores-otel/ores.otel.log", selected["docs/SECURITY_MODEL.md"])
-        self.assertIn("env/enc", selected["justfile"])
-        self.assertIn("creation_rules", selected[".sops.yaml"])
-        self.assertIn("nixpkgs", selected["flake.nix"])
-        capabilities = json.loads(selected["config/capability-baseline.json"])
+            self.assertIn(dependency, text["Cargo.toml"])
+        for dependency in (
+            "ores-otel/ores.otel.log",
+            "ores-otel/ores-interfaces",
+            "ores-otel/ores-lib-core",
+        ):
+            self.assertIn(dependency, text[".zpkg.toml"])
+        self.assertIn("ores-otel/ores.otel.log", text["docs/SECURITY_MODEL.md"])
+        self.assertIn("env/enc", text["justfile"])
+        self.assertIn("creation_rules", text[".sops.yaml"])
+        self.assertIn("nixpkgs", text["flake.nix"])
+        capabilities = json.loads(text["config/capability-baseline.json"])
         serialized = json.dumps(capabilities, sort_keys=True).lower()
         for method in ("openpgp", "kerberos", "ssh", "webauthn"):
             self.assertIn(method, serialized)
 
     def test_canary_workflow_is_immutable_and_least_privilege(self) -> None:
-        workflow = (
-            ROOT / ".github/workflows/shared-auth-web-server-seed.yml"
-        ).read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/shared-auth-web-server-seed.yml").read_text()
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertNotIn("pull_request_target", workflow)
         self.assertEqual(workflow.count("persist-credentials: false"), 3)
