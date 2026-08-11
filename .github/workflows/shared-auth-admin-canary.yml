@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ores-otel/ores.otel.log
-          ref: 21c1ea959dcbe89f65672dc7ee7ad3ea81121583
+          ref: 89e0b4ccdb4536c8b9c0846670eb175eee882a86
           persist-credentials: false
           path: logger
       - name: Install the pinned stable Rust toolchain
@@ -154,7 +154,7 @@ jobs:
               'source_seed_commit': seed['source_commit'],
               'source_seed_tree': seed['source_tree'],
               'source_seed_archive_sha256': seed['archive_sha256'],
-              'logger_source_commit': '21c1ea959dcbe89f65672dc7ee7ad3ea81121583',
+              'logger_source_commit': '89e0b4ccdb4536c8b9c0846670eb175eee882a86',
               'repair': None,
               'archive': {
                   'name': archive_path.name,
