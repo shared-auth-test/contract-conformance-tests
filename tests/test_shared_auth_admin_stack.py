@@ -64,6 +64,8 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         self.assertIn(evidence["status"], {"pending_hosted_run", "passed"})
         if evidence["status"] == "passed":
             self.assertRegex(str(evidence["runId"]), r"^[1-9][0-9]+$")
+            self.assertRegex(evidence["certifiedCommit"], r"^[0-9a-f]{40}$")
+            self.assertEqual(evidence["artifactName"], "shared-auth-astro-exact-c5bcff58")
             self.assertRegex(evidence["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
 
     def test_dashboard_schema_is_fail_closed(self) -> None:

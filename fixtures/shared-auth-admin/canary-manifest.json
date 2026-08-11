@@ -15,8 +15,12 @@
     "packageLockSha256": "d1587372f5719217644594fe1808f8e898c9cdf7dbf51254116f7827d45670a4"
   },
   "candidateEvidence": {
-    "status": "pending_hosted_run",
-    "workflow": ".github/workflows/shared-auth-admin-canary.yml"
+    "status": "passed",
+    "workflow": ".github/workflows/shared-auth-admin-canary.yml",
+    "runId": 31542469610,
+    "certifiedCommit": "ec6a39e6ed48aa4d0b16003cc9ae3cbe39810b47",
+    "artifactName": "shared-auth-astro-exact-c5bcff58",
+    "artifactDigest": "sha256:2b2dffde2e17dba4c8cdabd1fbd34ead4ed6090eb880b3c5a7edbdc3f5dff687"
   },
   "expected": {
     "organizationIsolation": "exact_membership_no_fallback",
