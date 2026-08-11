@@ -4,7 +4,7 @@
     "website": "7326ba28851de888dc267e6033bdb504af646047",
     "interfaces": "289f66434d919d77e57818292e127f7dcb137525",
     "core": "8f3299409ee33c55fdbb2d2e64630a5e0b72f6fc",
-    "logger": "89e0b4ccdb4536c8b9c0846670eb175eee882a86",
+    "logger": "b87ac48333e606dbe93dbecf55b04a7882b4605c",
     "webServerSeed": "e631453e7b1112c735b42de2a0eda40c6942742e"
   },
   "webServerSeedArchiveSha256": "9a218d031f40517795658def8e4e147a80503fa7349a267216c761b532ed0731",
@@ -30,7 +30,7 @@
     "repair": null,
     "committedCargoLock": true,
     "committedNpmLock": true,
-    "loggerSourceHead": "89e0b4ccdb4536c8b9c0846670eb175eee882a86"
+    "loggerSourceHead": "b87ac48333e606dbe93dbecf55b04a7882b4605c"
   },
   "historicalEvidence": {
     "status": "superseded",
