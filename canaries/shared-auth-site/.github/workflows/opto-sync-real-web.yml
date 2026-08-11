@@ -1,0 +1,17 @@
+name: opto-sync real static-site e2e
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - '.github/workflows/opto-sync-real-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-site:
+    uses: opto-sync/opto-sync-e2e/.github/workflows/real-web-app-reusable.yml@0560cd15a9c81aa7905b348a71c645354c1dad1f
+    with:
+      skip_repository_commands: true

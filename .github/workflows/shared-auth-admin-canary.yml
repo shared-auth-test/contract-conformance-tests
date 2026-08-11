@@ -34,6 +34,8 @@ jobs:
   astro:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      ASTRO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -42,12 +44,9 @@ jobs:
         with:
           node-version: '22'
           cache: ''
-      - name: Resolve the missing lockfile without lifecycle scripts
+      - name: Install from the source commit's exact lock
         working-directory: canaries/shared-auth-site
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from the generated exact lock
-        working-directory: canaries/shared-auth-site
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build Astro static site
         working-directory: canaries/shared-auth-site
         run: npm run build
@@ -62,8 +61,8 @@ jobs:
           import { readFileSync } from 'node:fs';
           const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
           if (lock.lockfileVersion !== 3) throw new Error(`unexpected lockfileVersion ${lock.lockfileVersion}`);
-          if (lock.packages?.['']?.dependencies?.astro !== '5.18.2') throw new Error('root Astro pin drift');
-          if (lock.packages?.['node_modules/astro']?.version !== '5.18.2') throw new Error('resolved Astro version drift');
+          if (lock.packages?.['']?.dependencies?.astro !== '7.2.1') throw new Error('root Astro pin drift');
+          if (lock.packages?.['node_modules/astro']?.version !== '7.2.1') throw new Error('resolved Astro version drift');
           NODE
           test -f dist/index.html
           test -f dist/dashboard/index.html
@@ -72,10 +71,13 @@ jobs:
           test ! -e Gemfile
           test ! -e config.toml
           test ! -e hugo.toml
-      - name: Upload generated lock and build evidence
+      - name: Audit the installed production graph
+        working-directory: canaries/shared-auth-site
+        run: npm audit --omit=dev --audit-level=low
+      - name: Upload exact-lock build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: shared-auth-astro-lock-580fb272
+          name: shared-auth-astro-exact-c5bcff58
           path: |
             canaries/shared-auth-site/package-lock.json
             canaries/shared-auth-site/dist

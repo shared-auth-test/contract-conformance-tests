@@ -18,7 +18,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
+      ASTRO_TELEMETRY_DISABLED: '1'
       PUBLIC_DASHBOARD_URL: ${{ vars.PUBLIC_DASHBOARD_URL }}
+      PUBLIC_DASHBOARD_URL_ALLOWLIST: ${{ vars.PUBLIC_DASHBOARD_URL_ALLOWLIST }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -26,11 +28,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-          cache: ''
-      - name: Resolve a lock without lifecycle scripts
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from the resolved lock
-        run: npm ci --no-audit --no-fund
+          cache: npm
+      - name: Install from the committed lock
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npm test
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa

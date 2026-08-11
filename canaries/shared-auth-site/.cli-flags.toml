@@ -1,0 +1,19 @@
+[help]
+url = "https://github.com/shared-auth/shared-auth.github.io"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+allow_unknown = false
+
+[flags.verify-dormant]
+env = "SHARED_AUTH_PAGES_VERIFY_DORMANT"
+aliases = ["verify-dormant"]
+type = "bool"
+default = true
+help = "Verify this repository remains a non-deployed placeholder without a marketing site."
+
+[flags.otel-endpoint]
+env = "OTEL_EXPORTER_OTLP_ENDPOINT"
+aliases = ["otel-endpoint"]
+type = "string"
+help = "OTLP collector inherited by repository checks."

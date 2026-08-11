@@ -1,13 +1,10 @@
 ---
-const candidate = import.meta.env.PUBLIC_DASHBOARD_URL?.trim();
-let dashboardUrl: string | undefined;
-if (candidate) {
-  const parsed = new URL(candidate);
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
-    throw new Error("PUBLIC_DASHBOARD_URL must be an HTTPS URL without embedded credentials");
-  }
-  dashboardUrl = parsed.toString();
-}
+import { resolveDashboardUrl } from "../lib/dashboard-url.mjs";
+
+const dashboardUrl = resolveDashboardUrl(
+  import.meta.env.PUBLIC_DASHBOARD_URL,
+  import.meta.env.PUBLIC_DASHBOARD_URL_ALLOWLIST,
+);
 ---
 <!doctype html>
 <html lang="en">
@@ -26,11 +23,11 @@ if (candidate) {
     <h1>Users, sessions, and roles—scoped to your organization.</h1>
     <p class="lede">The dashboard performs online token introspection, verifies the directory-read scope, and checks organization membership before returning any directory data.</p>
     {dashboardUrl ? (
-      <a class="primary" href={dashboardUrl} rel="noreferrer" referrerpolicy="no-referrer">Continue to dashboard →</a>
+      <a class="primary" href={dashboardUrl} rel="noreferrer noopener" referrerpolicy="no-referrer">Continue to dashboard →</a>
     ) : (
       <section class="pending" aria-live="polite">
         <b>Dashboard endpoint pending</b>
-        <span>Set the GitHub Pages variable <code>PUBLIC_DASHBOARD_URL</code> to the deployed HTTPS dashboard URL after the private server repository and route are provisioned.</span>
+        <span>Set <code>PUBLIC_DASHBOARD_URL</code> and its exact <code>PUBLIC_DASHBOARD_URL_ALLOWLIST</code> entry only after the private server repository and route are provisioned.</span>
       </section>
     )}
     <div class="guardrails">

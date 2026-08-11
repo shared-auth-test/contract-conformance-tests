@@ -1,33 +1,22 @@
 {
   "schema": "shared-auth-test.admin-stack-canary/v1",
   "sourceHeads": {
-    "website": "d9fc321da2d5a4bc54e9d6f138608e2bb450110b",
+    "website": "c5bcff58d238276cf0431c0cd09d99e2a1c82daf",
     "interfaces": "8a5f660933506948bc9da28d272e81e1076f0c0e",
     "core": "5099213354c5354c6b3276358d97de6c1635ea12",
     "webServerSeed": "67a3b5138a4050a23a409094ef094b050bb162fd"
   },
   "webServerSeedArchiveSha256": "095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848",
-  "sourceBlobs": {
-    "canaries/shared-auth-site/package.json": "498a79a82e5240da135be7ca11b21e9352df7760",
-    "canaries/shared-auth-site/astro.config.mjs": "a1a31207718989c5932bf8e4d6e4fc7b19c1192c",
-    "canaries/shared-auth-site/.github/workflows/pages.yml": "3c0df825a9dc2d87a688a10b58d2d2773ad11357",
-    "canaries/shared-auth-site/README.md": "175e7c8744e8280c475cc63987e4fa6f70bf5d7d",
-    "canaries/shared-auth-site/src/components/DashboardCta.astro": "37547b38541b2166ada7c1602aa0e3aae029e615",
-    "canaries/shared-auth-site/src/components/ClientShowcase.astro": "cba230ad50c3a1b160b83c8ceebf8b648e101bd0",
-    "canaries/shared-auth-site/src/pages/dashboard.astro": "56ed452451a24a69dcac3daab3727040fae3187a",
-    "canaries/shared-auth-site/src/pages/index.astro": "16ccb6a01aaaad1fd233e4c35c402f5fca9e8ad4",
-    "canaries/shared-auth-site/tests/site.test.mjs": "3b0590c5cb95ed2bf0ab2601bbbae18a41dbde71",
-    "canaries/shared-auth-site/public/.nojekyll": "8b137891791fe96927ad78e64b0aad7bded08bdc",
-    "fixtures/shared-auth-admin/schema.json": "ffd9ce1a3be3242133f4a1e0d3e1a01b59bf4d70",
-    "fixtures/shared-auth-admin/dashboard-response.json": "acbec6438b2b3b1f1b48273d75a13f6d8b048bb3",
-    "fixtures/shared-auth-admin/runtime-policy.json": "dbe664f58723183b8431182681503548d10d56a0"
+  "vendoredWebsite": {
+    "sourceTree": "81b9d4c6e9d1d82d88684c6a64c02a296e72d2da",
+    "fileCount": 29,
+    "digestAlgorithm": "sha256(sorted(git-blob-sha1 + two-spaces + relative-path + newline))",
+    "digest": "bfac140b7df17aed27730ed017b938de4569f5d5f743fbe1644744917ce2a457",
+    "packageLockSha256": "d1587372f5719217644594fe1808f8e898c9cdf7dbf51254116f7827d45670a4"
   },
-  "firstPassEvidence": {
-    "runId": 31436211978,
-    "artifactDigest": "sha256:05fd6695be36366d922ce31fd2257f083b9caa068768642a4b6d29b73688c32b",
-    "generatedLockSha256": "ecda303e5cf78942b993b1d3f8b3649476fb4d7b0c2b77ba5b1db14fc5678de8",
-    "lockfileVersion": 3,
-    "resolvedAstro": "5.18.2"
+  "candidateEvidence": {
+    "status": "pending_hosted_run",
+    "workflow": ".github/workflows/shared-auth-admin-canary.yml"
   },
   "expected": {
     "organizationIsolation": "exact_membership_no_fallback",

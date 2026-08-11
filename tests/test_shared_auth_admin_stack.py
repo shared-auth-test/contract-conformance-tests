@@ -22,6 +22,19 @@ def git_blob_sha(path: Path) -> str:
     return hashlib.sha1(header + payload).hexdigest()
 
 
+def vendored_tree_digest(root: Path) -> tuple[int, str]:
+    entries: list[str] = []
+    for path in sorted(
+        candidate
+        for candidate in root.rglob("*")
+        if candidate.is_file()
+        and candidate.relative_to(root).parts[0] not in {".astro", "dist", "node_modules"}
+    ):
+        relative = path.relative_to(root).as_posix()
+        entries.append(f"{git_blob_sha(path)}  {relative}\n")
+    return len(entries), hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
+
+
 class SharedAuthAdminStackCanary(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -39,15 +52,19 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         self.assertRegex(
             self.manifest["webServerSeedArchiveSha256"], r"^[0-9a-f]{64}$"
         )
-        evidence = self.manifest["firstPassEvidence"]
-        self.assertRegex(evidence["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
-        self.assertRegex(evidence["generatedLockSha256"], r"^[0-9a-f]{64}$")
-        self.assertEqual(evidence["lockfileVersion"], 3)
-        self.assertEqual(evidence["resolvedAstro"], "5.18.2")
-        for relative, expected in self.manifest["sourceBlobs"].items():
-            path = ROOT / relative
-            self.assertTrue(path.is_file(), relative)
-            self.assertEqual(git_blob_sha(path), expected, relative)
+        website = self.manifest["vendoredWebsite"]
+        self.assertRegex(website["sourceTree"], r"^[0-9a-f]{40}$")
+        self.assertRegex(website["packageLockSha256"], r"^[0-9a-f]{64}$")
+        file_count, digest = vendored_tree_digest(SITE)
+        self.assertEqual(file_count, website["fileCount"])
+        self.assertEqual(digest, website["digest"])
+        lock_digest = hashlib.sha256((SITE / "package-lock.json").read_bytes()).hexdigest()
+        self.assertEqual(lock_digest, website["packageLockSha256"])
+        evidence = self.manifest["candidateEvidence"]
+        self.assertIn(evidence["status"], {"pending_hosted_run", "passed"})
+        if evidence["status"] == "passed":
+            self.assertRegex(str(evidence["runId"]), r"^[1-9][0-9]+$")
+            self.assertRegex(evidence["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
 
     def test_dashboard_schema_is_fail_closed(self) -> None:
         defs = self.schema["$defs"]
@@ -148,16 +165,19 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
 
     def test_astro_handoff_is_static_and_fail_closed(self) -> None:
         package = read_json(SITE / "package.json")
-        self.assertEqual(package["dependencies"], {"astro": "5.18.2"})
+        self.assertEqual(package["dependencies"], {"astro": "7.2.1"})
         self.assertEqual(package["scripts"]["build"], "astro build")
         self.assertTrue((SITE / "public/.nojekyll").is_file())
         for forbidden in ("_config.yml", "Gemfile", "config.toml", "hugo.toml"):
             self.assertFalse((SITE / forbidden).exists())
 
         dashboard = (SITE / "src/pages/dashboard.astro").read_text(encoding="utf-8")
+        dashboard_url = (SITE / "src/lib/dashboard-url.mjs").read_text(encoding="utf-8")
         self.assertIn("PUBLIC_DASHBOARD_URL", dashboard)
-        self.assertIn('parsed.protocol !== "https:"', dashboard)
-        self.assertIn("parsed.username || parsed.password", dashboard)
+        self.assertIn('parsed.protocol !== "https:"', dashboard_url)
+        self.assertIn("parsed.username", dashboard_url)
+        self.assertIn("parsed.password", dashboard_url)
+        self.assertIn("PUBLIC_DASHBOARD_URL_ALLOWLIST", dashboard_url)
         self.assertIn("Dashboard endpoint pending", dashboard)
         self.assertIn("No implicit cross-organization fallback", dashboard)
         self.assertNotIn("Authorization: Bearer", dashboard)
@@ -170,8 +190,8 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         workflow = (SITE / ".github/workflows/pages.yml").read_text(encoding="utf-8")
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("npm install --package-lock-only --ignore-scripts", workflow)
-        self.assertLess(workflow.index("npm install --package-lock-only"), workflow.index("npm ci"))
+        self.assertIn("npm ci --ignore-scripts --no-audit --no-fund", workflow)
+        self.assertNotIn("npm install --package-lock-only", workflow)
         self.assertIn("pages: write\n      id-token: write", workflow)
         actions = [
             line.split("uses:", 1)[1].strip()
