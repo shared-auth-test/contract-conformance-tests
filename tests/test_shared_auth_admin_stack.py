@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "fixtures/shared-auth-admin/canary-manifest.json"
 SITE = ROOT / "canaries/shared-auth-site"
 FIXTURES = ROOT / "fixtures/shared-auth-admin"
+SEED = ROOT / "fixtures/shared-auth-web-server-seed"
 
 
 def read_json(path: Path) -> dict:
@@ -32,22 +33,65 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
 
     def test_sources_are_exactly_pinned(self) -> None:
         self.assertEqual(
-            self.manifest["schema"], "shared-auth-test.admin-stack-canary/v1"
+            self.manifest["schema"], "shared-auth-test.admin-stack-canary/v2"
         )
         for head in self.manifest["sourceHeads"].values():
             self.assertRegex(head, r"^[0-9a-f]{40}$")
         self.assertRegex(
             self.manifest["webServerSeedArchiveSha256"], r"^[0-9a-f]{64}$"
         )
-        evidence = self.manifest["firstPassEvidence"]
-        self.assertRegex(evidence["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
-        self.assertRegex(evidence["generatedLockSha256"], r"^[0-9a-f]{64}$")
-        self.assertEqual(evidence["lockfileVersion"], 3)
-        self.assertEqual(evidence["resolvedAstro"], "5.18.2")
+        candidate = self.manifest["candidateEvidence"]
+        self.assertEqual(candidate["status"], "pending_hosted_run")
+        self.assertIs(candidate["exactSourceArchive"], True)
+        self.assertIsNone(candidate["repair"])
+        self.assertIs(candidate["committedCargoLock"], True)
+        self.assertIs(candidate["committedNpmLock"], True)
+        self.assertEqual(
+            candidate["loggerSourceHead"], self.manifest["sourceHeads"]["logger"]
+        )
+        historical = self.manifest["historicalEvidence"]
+        self.assertEqual(historical["status"], "superseded")
+        self.assertRegex(historical["artifactDigest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertNotEqual(
+            historical["sourceHeads"], self.manifest["sourceHeads"]
+        )
         for relative, expected in self.manifest["sourceBlobs"].items():
             path = ROOT / relative
             self.assertTrue(path.is_file(), relative)
             self.assertEqual(git_blob_sha(path), expected, relative)
+
+        seed = read_json(SEED / "seed-manifest.json")
+        self.assertEqual(seed["schema"], "shared-auth-web-server-seed/v2")
+        self.assertEqual(seed["repository"], "shared-auth/shared-auth-web-server.js")
+        self.assertEqual(
+            seed["source_commit"], self.manifest["sourceHeads"]["webServerSeed"]
+        )
+        self.assertEqual(
+            seed["archive_sha256"], self.manifest["webServerSeedArchiveSha256"]
+        )
+        self.assertRegex(seed["source_tree"], r"^[0-9a-f]{40}$")
+        self.assertGreater(seed["archive_parts"], 0)
+        self.assertGreater(seed["file_count"], 0)
+        self.assertIn("env/dec", seed["excluded_paths"])
+        self.assertIn("__pycache__", seed["excluded_paths"])
+        self.assertFalse(
+            any(item["path"].startswith("env/dec/") for item in seed["source_files"])
+        )
+        self.assertFalse(
+            any(
+                "__pycache__" in Path(item["path"]).parts
+                for item in seed["source_files"]
+            )
+        )
+
+        workflow = (
+            ROOT / ".github/workflows/shared-auth-admin-canary.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            f"ref: {self.manifest['sourceHeads']['logger']}", workflow
+        )
+        self.assertIn("'repair': None", workflow)
+        self.assertNotIn("cargo generate-lockfile", workflow)
 
     def test_dashboard_schema_is_fail_closed(self) -> None:
         defs = self.schema["$defs"]
@@ -170,8 +214,8 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
         workflow = (SITE / ".github/workflows/pages.yml").read_text(encoding="utf-8")
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("npm install --package-lock-only --ignore-scripts", workflow)
-        self.assertLess(workflow.index("npm install --package-lock-only"), workflow.index("npm ci"))
+        self.assertIn("npm ci --no-audit --no-fund", workflow)
+        self.assertNotIn("npm install --package-lock-only", workflow)
         self.assertIn("pages: write\n      id-token: write", workflow)
         actions = [
             line.split("uses:", 1)[1].strip()
@@ -188,7 +232,7 @@ class SharedAuthAdminStackCanary(unittest.TestCase):
             r"gh[pousr]_[A-Za-z0-9]{20,}|lin_api_[A-Za-z0-9]{20,}|"
             r"BEGIN [A-Z ]*PRIVATE KEY"
         )
-        for root in (SITE, FIXTURES):
+        for root in (SITE, FIXTURES, SEED):
             for path in root.rglob("*"):
                 if path.is_file():
                     text = path.read_text(encoding="utf-8", errors="ignore")

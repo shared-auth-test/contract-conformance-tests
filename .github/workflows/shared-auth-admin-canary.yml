@@ -5,6 +5,7 @@ on:
     paths:
       - canaries/shared-auth-site/**
       - fixtures/shared-auth-admin/**
+      - fixtures/shared-auth-web-server-seed/**
       - tests/test_shared_auth_admin_stack.py
       - .github/workflows/shared-auth-admin-canary.yml
   workflow_dispatch:
@@ -31,6 +32,177 @@ jobs:
       - name: Preserve repository policy
         run: python3 scripts/verify_repository.py
 
+  rust-seed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out the isolated canary repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          path: canary
+      - name: Check out the immutable Ores Rust logger source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ores-otel/ores.otel.log
+          ref: b87ac48333e606dbe93dbecf55b04a7882b4605c
+          persist-credentials: false
+          path: logger
+      - name: Install the pinned stable Rust toolchain
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          components: rustfmt, clippy
+      - name: Materialize and verify the certified archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          seed_dir='canary/fixtures/shared-auth-web-server-seed'
+          server_dir="$RUNNER_TEMP/shared-auth-web-server.js"
+          python3 "$seed_dir/materialize.py" "$server_dir"
+          mkdir -p "$server_dir/.deps"
+          cp -a logger/sdk/rust "$server_dir/.deps/ores-otel-log"
+          python3 - "$seed_dir/seed-manifest.json" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+          manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+          assert manifest['schema'] == 'shared-auth-web-server-seed/v2'
+          assert manifest['repository'] == 'shared-auth/shared-auth-web-server.js'
+          assert re.fullmatch(r'[0-9a-f]{40}', manifest['source_commit'])
+          assert re.fullmatch(r'[0-9a-f]{40}', manifest['source_tree'])
+          assert re.fullmatch(r'[0-9a-f]{64}', manifest['archive_sha256'])
+          assert manifest['archive_parts'] > 0
+          assert manifest['archive_bytes'] > 0
+          assert manifest['file_count'] > 0
+          assert manifest['uncompressed_bytes'] > 0
+          print('exact seed manifest verified')
+          PY
+      - name: Run policy and language syntax checks
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check.py
+          python3 -m compileall -q scripts
+          bash -n scripts/*.sh
+          node --check scripts/vendor-htmx.mjs
+      - name: Resolve and audit the Rust dependency graph
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+          cargo tree --locked --edges normal,build,dev > "$RUNNER_TEMP/cargo-tree.txt"
+      - name: Build a deterministic corrected-source artifact
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/shared-auth-web-server-candidate.tar.gz" "$RUNNER_TEMP/shared-auth-web-server-candidate.json" "$GITHUB_WORKSPACE/canary/fixtures/shared-auth-web-server-seed/seed-manifest.json" <<'PY'
+          from __future__ import annotations
+
+          import gzip
+          import hashlib
+          import io
+          import json
+          from pathlib import Path
+          import stat
+          import sys
+          import tarfile
+
+          root = Path.cwd().resolve()
+          archive_path = Path(sys.argv[1])
+          manifest_path = Path(sys.argv[2])
+          seed = json.loads(Path(sys.argv[3]).read_text(encoding='utf-8'))
+          excluded = {'.astro', '.deps', '.git', '.pytest_cache', '.tools', '.vendor', '__pycache__', 'dist', 'env/dec', 'node_modules', 'target'}
+          files: list[tuple[str, Path, bytes, int]] = []
+          for path in sorted(root.rglob('*')):
+              relative = path.relative_to(root)
+              relative_text = relative.as_posix()
+              if (
+                  any(relative_text == part or relative_text.startswith(f'{part}/') for part in excluded)
+                  or any(part in {'.pytest_cache', '__pycache__'} for part in relative.parts)
+                  or relative.suffix in {'.pyc', '.pyo'}
+              ):
+                  continue
+              if path.is_symlink():
+                  raise SystemExit(f'symlink is not allowed in candidate: {relative}')
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              mode = stat.S_IMODE(path.stat().st_mode) & 0o777
+              files.append((relative.as_posix(), path, data, mode))
+
+          with archive_path.open('wb') as raw:
+              with gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz:
+                  with tarfile.open(fileobj=gz, mode='w', format=tarfile.PAX_FORMAT) as tar:
+                      for relative, _path, data, mode in files:
+                          info = tarfile.TarInfo(relative)
+                          info.size = len(data)
+                          info.mode = mode
+                          info.mtime = 0
+                          info.uid = 0
+                          info.gid = 0
+                          info.uname = ''
+                          info.gname = ''
+                          tar.addfile(info, io.BytesIO(data))
+
+          manifest = {
+              'schema': 'shared-auth-web-server-candidate/v1',
+              'repository': 'shared-auth/shared-auth-web-server.js',
+              'source_seed_commit': seed['source_commit'],
+              'source_seed_tree': seed['source_tree'],
+              'source_seed_archive_sha256': seed['archive_sha256'],
+              'logger_source_commit': 'b87ac48333e606dbe93dbecf55b04a7882b4605c',
+              'repair': None,
+              'archive': {
+                  'name': archive_path.name,
+                  'sha256': hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+                  'bytes': archive_path.stat().st_size,
+              },
+              'cargo_lock_sha256': hashlib.sha256((root / 'Cargo.lock').read_bytes()).hexdigest(),
+              'file_count': len(files),
+              'uncompressed_bytes': sum(len(data) for _relative, _path, data, _mode in files),
+              'files': [
+                  {
+                      'path': relative,
+                      'sha256': hashlib.sha256(data).hexdigest(),
+                      'bytes': len(data),
+                      'mode': format(mode, '04o'),
+                  }
+                  for relative, _path, data, mode in files
+              ],
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps({key: manifest[key] for key in ('file_count', 'uncompressed_bytes', 'cargo_lock_sha256')}, sort_keys=True))
+          print(json.dumps(manifest['archive'], sort_keys=True))
+          PY
+      - name: Format, compile, test, and lint the Rust server
+        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --locked --all-targets
+          cargo check --locked --all-targets --all-features
+          cargo test --locked --all-targets
+          cargo test --locked --all-targets --all-features
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Upload exact corrected-source build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shared-auth-web-server-candidate-v1
+          path: |
+            ${{ runner.temp }}/shared-auth-web-server-candidate.tar.gz
+            ${{ runner.temp }}/shared-auth-web-server-candidate.json
+            ${{ runner.temp }}/shared-auth-web-server.js/Cargo.lock
+            ${{ runner.temp }}/cargo-metadata.json
+            ${{ runner.temp }}/cargo-tree.txt
+            canary/fixtures/shared-auth-web-server-seed/seed-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+
   astro:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -42,10 +214,7 @@ jobs:
         with:
           node-version: '22'
           cache: ''
-      - name: Resolve the missing lockfile without lifecycle scripts
-        working-directory: canaries/shared-auth-site
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from the generated exact lock
+      - name: Install from the reviewed exact lock
         working-directory: canaries/shared-auth-site
         run: npm ci --no-audit --no-fund
       - name: Build Astro static site
@@ -72,10 +241,10 @@ jobs:
           test ! -e Gemfile
           test ! -e config.toml
           test ! -e hugo.toml
-      - name: Upload generated lock and build evidence
+      - name: Upload reviewed lock and build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: shared-auth-astro-lock-580fb272
+          name: shared-auth-astro-lock-7326ba2
           path: |
             canaries/shared-auth-site/package-lock.json
             canaries/shared-auth-site/dist
