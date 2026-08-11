@@ -1,7 +1,7 @@
 {
   "schema": "shared-auth-test.admin-stack-canary/v1",
   "sourceHeads": {
-    "website": "580fb272bb105c7f9b5b2442195da8155325534b",
+    "website": "d9fc321da2d5a4bc54e9d6f138608e2bb450110b",
     "interfaces": "8a5f660933506948bc9da28d272e81e1076f0c0e",
     "core": "5099213354c5354c6b3276358d97de6c1635ea12",
     "webServerSeed": "67a3b5138a4050a23a409094ef094b050bb162fd"
@@ -15,8 +15,8 @@
     "canaries/shared-auth-site/src/components/DashboardCta.astro": "37547b38541b2166ada7c1602aa0e3aae029e615",
     "canaries/shared-auth-site/src/components/ClientShowcase.astro": "cba230ad50c3a1b160b83c8ceebf8b648e101bd0",
     "canaries/shared-auth-site/src/pages/dashboard.astro": "56ed452451a24a69dcac3daab3727040fae3187a",
-    "canaries/shared-auth-site/src/pages/index.astro": "89c6b2a60629d2268ca4ad93d07b5a7d16124d58",
-    "canaries/shared-auth-site/tests/site.test.mjs": "c286d0bcdde6c113cb0956326fc02fe173d0f524",
+    "canaries/shared-auth-site/src/pages/index.astro": "16ccb6a01aaaad1fd233e4c35c402f5fca9e8ad4",
+    "canaries/shared-auth-site/tests/site.test.mjs": "3b0590c5cb95ed2bf0ab2601bbbae18a41dbde71",
     "canaries/shared-auth-site/public/.nojekyll": "8b137891791fe96927ad78e64b0aad7bded08bdc",
     "fixtures/shared-auth-admin/schema.json": "ffd9ce1a3be3242133f4a1e0d3e1a01b59bf4d70",
     "fixtures/shared-auth-admin/dashboard-response.json": "acbec6438b2b3b1f1b48273d75a13f6d8b048bb3",
