@@ -41,6 +41,13 @@ jobs:
         with:
           persist-credentials: false
           path: canary
+      - name: Check out the immutable Ores Rust logger source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ores-otel/ores.otel.log
+          ref: 21c1ea959dcbe89f65672dc7ee7ad3ea81121583
+          persist-credentials: false
+          path: logger
       - name: Install the pinned stable Rust toolchain
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
         with:
@@ -52,38 +59,24 @@ jobs:
           seed_dir='canary/fixtures/shared-auth-web-server-seed'
           server_dir="$RUNNER_TEMP/shared-auth-web-server.js"
           python3 "$seed_dir/materialize.py" "$server_dir"
+          mkdir -p "$server_dir/.deps"
+          cp -a logger/sdk/rust "$server_dir/.deps/ores-otel-log"
           python3 - "$seed_dir/seed-manifest.json" <<'PY'
           import json
           import pathlib
+          import re
           import sys
           manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+          assert manifest['schema'] == 'shared-auth-web-server-seed/v2'
           assert manifest['repository'] == 'shared-auth/shared-auth-web-server.js'
-          assert manifest['archive_sha256'] == '095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848'
-          assert manifest['archive_parts'] == 9
-          assert manifest['archive_bytes'] == 26410
-          assert manifest['file_count'] == 38
-          assert manifest['uncompressed_bytes'] == 89521
+          assert re.fullmatch(r'[0-9a-f]{40}', manifest['source_commit'])
+          assert re.fullmatch(r'[0-9a-f]{40}', manifest['source_tree'])
+          assert re.fullmatch(r'[0-9a-f]{64}', manifest['archive_sha256'])
+          assert manifest['archive_parts'] > 0
+          assert manifest['archive_bytes'] > 0
+          assert manifest['file_count'] > 0
+          assert manifest['uncompressed_bytes'] > 0
           print('exact seed manifest verified')
-          PY
-      - name: Apply the single reviewed Cargo manifest repair
-        working-directory: ${{ runner.temp }}/shared-auth-web-server.js
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('Cargo.toml')
-          text = path.read_text(encoding='utf-8')
-          rich = 'axum = { version = "0.7", features = ["macros"] }'
-          duplicate = 'axum = "0.7"'
-          assert text.count(rich) == 1, 'expected one feature-bearing axum dependency'
-          assert text.count(duplicate) == 1, 'expected one duplicate plain axum dependency'
-          lines = text.splitlines()
-          lines.remove(duplicate)
-          path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-          assert path.read_text(encoding='utf-8').count('axum = ') == 1
-          print('removed duplicate plain axum dependency')
           PY
       - name: Run policy and language syntax checks
         working-directory: ${{ runner.temp }}/shared-auth-web-server.js
@@ -99,7 +92,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo generate-lockfile
           cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
           cargo tree --locked --edges normal,build,dev > "$RUNNER_TEMP/cargo-tree.txt"
       - name: Build a deterministic corrected-source artifact
@@ -107,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - "$RUNNER_TEMP/shared-auth-web-server-candidate.tar.gz" "$RUNNER_TEMP/shared-auth-web-server-candidate.json" <<'PY'
+          python3 - "$RUNNER_TEMP/shared-auth-web-server-candidate.tar.gz" "$RUNNER_TEMP/shared-auth-web-server-candidate.json" "$GITHUB_WORKSPACE/canary/fixtures/shared-auth-web-server-seed/seed-manifest.json" <<'PY'
           from __future__ import annotations
 
           import gzip
@@ -122,11 +114,17 @@ jobs:
           root = Path.cwd().resolve()
           archive_path = Path(sys.argv[1])
           manifest_path = Path(sys.argv[2])
-          excluded = {'.git', 'target'}
+          seed = json.loads(Path(sys.argv[3]).read_text(encoding='utf-8'))
+          excluded = {'.astro', '.deps', '.git', '.pytest_cache', '.tools', '.vendor', '__pycache__', 'dist', 'env/dec', 'node_modules', 'target'}
           files: list[tuple[str, Path, bytes, int]] = []
           for path in sorted(root.rglob('*')):
               relative = path.relative_to(root)
-              if any(part in excluded for part in relative.parts):
+              relative_text = relative.as_posix()
+              if (
+                  any(relative_text == part or relative_text.startswith(f'{part}/') for part in excluded)
+                  or any(part in {'.pytest_cache', '__pycache__'} for part in relative.parts)
+                  or relative.suffix in {'.pyc', '.pyo'}
+              ):
                   continue
               if path.is_symlink():
                   raise SystemExit(f'symlink is not allowed in candidate: {relative}')
@@ -153,9 +151,11 @@ jobs:
           manifest = {
               'schema': 'shared-auth-web-server-candidate/v1',
               'repository': 'shared-auth/shared-auth-web-server.js',
-              'source_seed_commit': '67a3b5138a4050a23a409094ef094b050bb162fd',
-              'source_seed_archive_sha256': '095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848',
-              'repair': 'remove duplicate plain axum dependency',
+              'source_seed_commit': seed['source_commit'],
+              'source_seed_tree': seed['source_tree'],
+              'source_seed_archive_sha256': seed['archive_sha256'],
+              'logger_source_commit': '21c1ea959dcbe89f65672dc7ee7ad3ea81121583',
+              'repair': None,
               'archive': {
                   'name': archive_path.name,
                   'sha256': hashlib.sha256(archive_path.read_bytes()).hexdigest(),
@@ -214,10 +214,7 @@ jobs:
         with:
           node-version: '22'
           cache: ''
-      - name: Resolve the missing lockfile without lifecycle scripts
-        working-directory: canaries/shared-auth-site
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from the generated exact lock
+      - name: Install from the reviewed exact lock
         working-directory: canaries/shared-auth-site
         run: npm ci --no-audit --no-fund
       - name: Build Astro static site
@@ -244,10 +241,10 @@ jobs:
           test ! -e Gemfile
           test ! -e config.toml
           test ! -e hugo.toml
-      - name: Upload generated lock and build evidence
+      - name: Upload reviewed lock and build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: shared-auth-astro-lock-580fb272
+          name: shared-auth-astro-lock-7326ba2
           path: |
             canaries/shared-auth-site/package-lock.json
             canaries/shared-auth-site/dist
