@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shared-auth — one identity across every OreSoftware app</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.65 system-ui, -apple-system, Segoe UI, sans-serif;
+         max-width: 42rem; margin: 4rem auto; padding: 0 1.25rem; }
+  h1 { font-size: 1.6rem; } h2 { font-size: 1.15rem; margin-top: 2.25rem; }
+  code { background: color-mix(in srgb, currentColor 8%, transparent);
+         padding: .1rem .35rem; border-radius: 4px; }
+  .muted { opacity: .7; }
+  ul { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+<h1>shared-auth</h1>
+<p class="muted">One identity across every OreSoftware app — running in tandem with
+Supabase, never replacing it.</p>
+
+<h2>What it is</h2>
+<p>A centralized auth server that verifies Supabase access tokens from any of our
+orgs, mirrors identities into one namespace (<code>shared_user_id</code>), and mints a
+single ES256 JWT every service trusts via one JWKS.</p>
+
+<h2>The dual-auth race</h2>
+<p>Every guard races <strong>shared-auth</strong> against <strong>Supabase
+built-in auth</strong> concurrently and takes the first success — so either
+authority alone carries a multi-minute outage of the other, and "could not
+decide" is never rendered as "logged out".</p>
+
+<h2>Repos</h2>
+<ul>
+  <li><code>shared-auth-server.rs</code> — the server (Rust, Axum, SeaORM, Maud)</li>
+  <li><code>shared-auth-lib</code> — guards: race + limited HTML (rust · ts · go · js · gleam · dart)</li>
+  <li><code>shared-auth-interfaces</code> — the contract (SPEC, schema, 6 bindings)</li>
+  <li><code>shared-auth-clients</code> — thin HTTP SDKs</li>
+  <li><code>shared-auth-infra</code> — edge/DNS plane</li>
+  <li><code>shared-auth-mcp-server.rs</code> — diagnostics MCP server</li>
+  <li><code>shared-auth-monorepo</code> — the integration tree (apps/ submodules)</li>
+</ul>
+
+<p class="muted">github.com/shared-auth</p>
+</body>
+</html>
