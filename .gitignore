@@ -6,3 +6,6 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+canaries/shared-auth-site/.astro/
+canaries/shared-auth-site/dist/
+canaries/shared-auth-site/node_modules/

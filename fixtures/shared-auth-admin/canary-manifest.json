@@ -1,33 +1,47 @@
 {
-  "schema": "shared-auth-test.admin-stack-canary/v1",
+  "schema": "shared-auth-test.admin-stack-canary/v2",
   "sourceHeads": {
-    "website": "580fb272bb105c7f9b5b2442195da8155325534b",
-    "interfaces": "8a5f660933506948bc9da28d272e81e1076f0c0e",
-    "core": "5099213354c5354c6b3276358d97de6c1635ea12",
-    "webServerSeed": "67a3b5138a4050a23a409094ef094b050bb162fd"
+    "website": "7326ba28851de888dc267e6033bdb504af646047",
+    "interfaces": "289f66434d919d77e57818292e127f7dcb137525",
+    "core": "8f3299409ee33c55fdbb2d2e64630a5e0b72f6fc",
+    "logger": "b87ac48333e606dbe93dbecf55b04a7882b4605c",
+    "webServerSeed": "e631453e7b1112c735b42de2a0eda40c6942742e"
   },
-  "webServerSeedArchiveSha256": "095c5e0c464aae73b85f399614c0ad11be1acfb67fd2a40a4da4ee1da83cc848",
+  "webServerSeedArchiveSha256": "9a218d031f40517795658def8e4e147a80503fa7349a267216c761b532ed0731",
   "sourceBlobs": {
     "canaries/shared-auth-site/package.json": "498a79a82e5240da135be7ca11b21e9352df7760",
+    "canaries/shared-auth-site/package-lock.json": "702e24b4592960466f16b80d81b73e1a34181e67",
     "canaries/shared-auth-site/astro.config.mjs": "a1a31207718989c5932bf8e4d6e4fc7b19c1192c",
-    "canaries/shared-auth-site/.github/workflows/pages.yml": "3c0df825a9dc2d87a688a10b58d2d2773ad11357",
+    "canaries/shared-auth-site/.github/workflows/pages.yml": "6632cc67b3a8973084f225a4db2787557ba1e81c",
     "canaries/shared-auth-site/README.md": "175e7c8744e8280c475cc63987e4fa6f70bf5d7d",
     "canaries/shared-auth-site/src/components/DashboardCta.astro": "37547b38541b2166ada7c1602aa0e3aae029e615",
     "canaries/shared-auth-site/src/components/ClientShowcase.astro": "cba230ad50c3a1b160b83c8ceebf8b648e101bd0",
     "canaries/shared-auth-site/src/pages/dashboard.astro": "56ed452451a24a69dcac3daab3727040fae3187a",
-    "canaries/shared-auth-site/src/pages/index.astro": "89c6b2a60629d2268ca4ad93d07b5a7d16124d58",
+    "canaries/shared-auth-site/src/pages/index.astro": "50b289e91129b9ed3c857d9e12682f86121022cf",
     "canaries/shared-auth-site/tests/site.test.mjs": "c286d0bcdde6c113cb0956326fc02fe173d0f524",
     "canaries/shared-auth-site/public/.nojekyll": "8b137891791fe96927ad78e64b0aad7bded08bdc",
     "fixtures/shared-auth-admin/schema.json": "ffd9ce1a3be3242133f4a1e0d3e1a01b59bf4d70",
     "fixtures/shared-auth-admin/dashboard-response.json": "acbec6438b2b3b1f1b48273d75a13f6d8b048bb3",
     "fixtures/shared-auth-admin/runtime-policy.json": "dbe664f58723183b8431182681503548d10d56a0"
   },
-  "firstPassEvidence": {
+  "candidateEvidence": {
+    "status": "pending_hosted_run",
+    "exactSourceArchive": true,
+    "repair": null,
+    "committedCargoLock": true,
+    "committedNpmLock": true,
+    "loggerSourceHead": "b87ac48333e606dbe93dbecf55b04a7882b4605c"
+  },
+  "historicalEvidence": {
+    "status": "superseded",
+    "sourceHeads": {
+      "website": "580fb272bb105c7f9b5b2442195da8155325534b",
+      "interfaces": "8a5f660933506948bc9da28d272e81e1076f0c0e",
+      "core": "5099213354c5354c6b3276358d97de6c1635ea12",
+      "webServerSeed": "67a3b5138a4050a23a409094ef094b050bb162fd"
+    },
     "runId": 31436211978,
-    "artifactDigest": "sha256:05fd6695be36366d922ce31fd2257f083b9caa068768642a4b6d29b73688c32b",
-    "generatedLockSha256": "ecda303e5cf78942b993b1d3f8b3649476fb4d7b0c2b77ba5b1db14fc5678de8",
-    "lockfileVersion": 3,
-    "resolvedAstro": "5.18.2"
+    "artifactDigest": "sha256:05fd6695be36366d922ce31fd2257f083b9caa068768642a4b6d29b73688c32b"
   },
   "expected": {
     "organizationIsolation": "exact_membership_no_fallback",

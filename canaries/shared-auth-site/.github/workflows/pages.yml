@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 20
     env:
       PUBLIC_DASHBOARD_URL: ${{ vars.PUBLIC_DASHBOARD_URL }}
+      ASTRO_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -27,9 +28,7 @@ jobs:
         with:
           node-version: '22'
           cache: ''
-      - name: Resolve a lock without lifecycle scripts
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from the resolved lock
+      - name: Install from the reviewed exact lock
         run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm test
