@@ -9,3 +9,9 @@ htmlcov/
 canaries/shared-auth-site/.astro/
 canaries/shared-auth-site/dist/
 canaries/shared-auth-site/node_modules/
+
+# Repository-local temporary data and authorized Git worktrees
+tmp
+temp
+tmp/worktrees
+temp/worktrees
