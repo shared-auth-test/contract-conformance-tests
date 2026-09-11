@@ -11,6 +11,11 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 python scripts/verify_repository.py
 ```
 
-The initial model is executable rather than a placeholder. Product adapters should be added through focused pull requests while preserving the reference-model tests as an oracle.
+## Contract slices
+
+* The original reference store proves deterministic replay, canonical serialization, tombstones, and idempotency conflict handling.
+* [`docs/session-continuity-contract.md`](docs/session-continuity-contract.md) proves token-blind account presentation, the 50-minute renewal boundary, cross-consumer logout propagation, fail-closed tenant/assurance/session checks, bounded offline UI grace, and public-state leak rejection.
+
+Product adapters should be added through focused pull requests while preserving the reference-model tests as an oracle. Public status responses are presentation hints only and must never become product authorization credentials.
 
 Tracking: https://github.com/ORESoftware/ai-agent-coordinator.rs/issues/139
