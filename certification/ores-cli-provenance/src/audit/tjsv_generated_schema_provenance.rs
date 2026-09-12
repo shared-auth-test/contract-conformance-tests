@@ -477,10 +477,8 @@ mod tests {
         symlink(&outside, workflows.join("contracts.yml")).expect("workflow symlink");
 
         let findings = audit_generated_schema_provenance(directory.path()).findings;
-        assert!(
-            findings
-                .iter()
-                .any(|finding| finding.code == "tjsv-provenance-source-symlink")
-        );
+        assert!(findings
+            .iter()
+            .any(|finding| finding.code == "tjsv-provenance-source-symlink"));
     }
 }
