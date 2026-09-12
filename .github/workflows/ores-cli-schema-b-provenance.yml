@@ -39,7 +39,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$expected"
           module=certification/ores-cli-provenance/src/audit/tjsv_generated_schema_provenance.rs
           dispatcher=certification/ores-cli-provenance/snapshots/ores-cli-audit-mod.rs
-          test "$(git hash-object "$module")" = "08f1999413e4d100cadd36dd249b3c8b915a71ad"
+          test "$(git hash-object "$module")" = "370e8048e003755978abc90c40c4b51f6cda42ab"
           test "$(git hash-object "$dispatcher")" = "3f55e3347a82eee6c1e10dba44c1dd2b1505ec45"
           evidence_line=$(grep -n 'contract_generated_evidence::augment_contract_generated_evidence_audit' "$dispatcher" | head -1 | cut -d: -f1)
           drift_line=$(grep -n 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit' "$dispatcher" | head -1 | cut -d: -f1)
