@@ -1,0 +1,73 @@
+name: ORES CLI Schema B provenance certification
+
+on:
+  pull_request:
+    paths:
+      - 'certification/ores-cli-provenance/**'
+      - '.github/workflows/ores-cli-schema-b-provenance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'certification/ores-cli-provenance/**'
+      - '.github/workflows/ores-cli-schema-b-provenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-schema-b-provenance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-source-rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact test candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact ores-cli source blobs and dispatcher order
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected"
+          module=certification/ores-cli-provenance/src/audit/tjsv_generated_schema_provenance.rs
+          dispatcher=certification/ores-cli-provenance/snapshots/ores-cli-audit-mod.rs
+          test "$(git hash-object "$module")" = "08f1999413e4d100cadd36dd249b3c8b915a71ad"
+          test "$(git hash-object "$dispatcher")" = "3f55e3347a82eee6c1e10dba44c1dd2b1505ec45"
+          evidence_line=$(grep -n 'contract_generated_evidence::augment_contract_generated_evidence_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          drift_line=$(grep -n 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          provenance_line=$(grep -n 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          pins_line=$(grep -n 'workflow_action_pins::augment_workflow_action_pin_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          test "$evidence_line" -lt "$drift_line"
+          test "$drift_line" -lt "$provenance_line"
+          test "$provenance_line" -lt "$pins_line"
+
+      - name: Install exact Rust 1.88 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.88.0 --version
+          cargo +1.88.0 --version
+
+      - name: Format exact-source harness
+        run: cargo +1.88.0 fmt --manifest-path certification/ores-cli-provenance/Cargo.toml -- --check
+
+      - name: Strict Clippy exact-source harness
+        run: cargo +1.88.0 clippy --manifest-path certification/ores-cli-provenance/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run debug unit and black-box regressions
+        run: cargo +1.88.0 test --manifest-path certification/ores-cli-provenance/Cargo.toml
+
+      - name: Run release unit and black-box regressions
+        run: cargo +1.88.0 test --release --manifest-path certification/ores-cli-provenance/Cargo.toml
+
+      - name: Prove certification leaves reviewed sources unchanged
+        run: git diff --exit-code
