@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "issuer": "https://auth.example.test",
+  "audience": "shared-auth-canary",
+  "session_ttl_seconds": 3600,
+  "passkey_required": true
+}
