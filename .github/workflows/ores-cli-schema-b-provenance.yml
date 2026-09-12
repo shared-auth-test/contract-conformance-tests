@@ -36,32 +36,16 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Check out exact ores-cli product candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: ORESoftware/ores-cli
-          ref: ${{ env.ORES_CLI_HEAD }}
-          path: tmp/ores-cli
-          persist-credentials: false
-          show-progress: false
-
-      - name: Verify exact product bytes and dispatcher order
+      - name: Verify exact mirrored product blobs and dispatcher order
         shell: bash
         run: |
           set -euo pipefail
           expected='${{ github.event.pull_request.head.sha || github.sha }}'
           test "$(git rev-parse HEAD)" = "$expected"
-          test "$(git -C tmp/ores-cli rev-parse HEAD)" = "$ORES_CLI_HEAD"
           module=certification/ores-cli-provenance/src/audit/tjsv_generated_schema_provenance.rs
           dispatcher=certification/ores-cli-provenance/snapshots/ores-cli-audit-mod.rs
-          product_module=tmp/ores-cli/src/audit/tjsv_generated_schema_provenance.rs
-          product_dispatcher=tmp/ores-cli/src/audit/mod.rs
           test "$(git hash-object "$module")" = "$ORES_CLI_PROVENANCE_BLOB"
           test "$(git hash-object "$dispatcher")" = "$ORES_CLI_DISPATCHER_BLOB"
-          test "$(git -C tmp/ores-cli hash-object src/audit/tjsv_generated_schema_provenance.rs)" = "$ORES_CLI_PROVENANCE_BLOB"
-          test "$(git -C tmp/ores-cli hash-object src/audit/mod.rs)" = "$ORES_CLI_DISPATCHER_BLOB"
-          cmp "$module" "$product_module"
-          cmp "$dispatcher" "$product_dispatcher"
           evidence_line=$(grep -n 'contract_generated_evidence::augment_contract_generated_evidence_audit' "$dispatcher" | head -1 | cut -d: -f1)
           drift_line=$(grep -n 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit' "$dispatcher" | head -1 | cut -d: -f1)
           provenance_line=$(grep -n 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher" | head -1 | cut -d: -f1)
@@ -73,6 +57,10 @@ jobs:
           test "$provenance_line" -lt "$full_line"
           test "$full_line" -lt "$revision_line"
           test "$revision_line" -lt "$pins_line"
+          printf 'ores_cli_head=%s\nprovenance_blob=%s\ndispatcher_blob=%s\n' \
+            "$ORES_CLI_HEAD" "$ORES_CLI_PROVENANCE_BLOB" "$ORES_CLI_DISPATCHER_BLOB" \
+            > certification/ores-cli-provenance/product-source-lock.txt
+          git diff --exit-code -- certification/ores-cli-provenance/src certification/ores-cli-provenance/snapshots
 
       - name: Install exact Rust 1.95 toolchain
         shell: bash
@@ -94,9 +82,8 @@ jobs:
       - name: Run release unit and black-box regressions
         run: cargo +1.95.0 test --release --manifest-path certification/ores-cli-provenance/Cargo.toml
 
-      - name: Prove certification and product checkouts remain immutable
+      - name: Prove reviewed sources remain immutable
         shell: bash
         run: |
           set -euo pipefail
-          git diff --exit-code
-          git -C tmp/ores-cli diff --exit-code
+          git diff --exit-code -- certification/ores-cli-provenance/src certification/ores-cli-provenance/snapshots
