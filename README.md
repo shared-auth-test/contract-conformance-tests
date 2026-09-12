@@ -15,6 +15,7 @@ python scripts/verify_repository.py
 
 * The original reference store proves deterministic replay, canonical serialization, tombstones, and idempotency conflict handling.
 * [`docs/session-continuity-contract.md`](docs/session-continuity-contract.md) proves token-blind account presentation, the 50-minute renewal boundary, cross-consumer logout propagation, fail-closed tenant/assurance/session checks, bounded offline UI grace, and public-state leak rejection.
+* [`contracts/iam-capability/`](contracts/iam-capability/) independently authors the IAM capability catalog in TypeSpec and JSON Schema Draft 2020-12. CI transpiles TypeSpec to a separate comparison-only JSON Schema B, compares it with authored Schema A, executes a recorded valid/invalid corpus, verifies Contract IR against the current input closure, and runs deliberate drift controls in both source lanes.
 
 Product adapters should be added through focused pull requests while preserving the reference-model tests as an oracle. Public status responses are presentation hints only and must never become product authorization credentials.
 

@@ -1,0 +1,12 @@
+{
+  "version": "2026-09-12",
+  "capabilities": [
+    {
+      "feature": "Risk evaluation",
+      "category": "policy_risk_audit",
+      "status": "partial",
+      "sourceRepository": "shared-auth/shared-auth-admin-api-server.rs",
+      "sourceRevision": "reviewed-commit-sha"
+    }
+  ]
+}

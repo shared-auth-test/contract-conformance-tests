@@ -1,0 +1,11 @@
+{
+  "feature": "Passkey enrollment",
+  "category": "passkeys",
+  "status": "partial",
+  "sourceRepository": "shared-auth/shared-auth-web-server.rs",
+  "sourceRevision": "reviewed-commit-sha",
+  "tests": [
+    "passkey-read-model",
+    "mutation-gate"
+  ]
+}
