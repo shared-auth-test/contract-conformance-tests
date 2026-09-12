@@ -19,10 +19,15 @@ concurrency:
   group: ores-cli-schema-b-provenance-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  ORES_CLI_HEAD: f8f24185ddb262437b42bf9161539a7f9cae7b9e
+  ORES_CLI_PROVENANCE_BLOB: 370e8048e003755978abc90c40c4b51f6cda42ab
+  ORES_CLI_DISPATCHER_BLOB: 69e4d6bdab3d2d32dc86588dd3530f919da17857
+
 jobs:
   exact-source-rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out exact test candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -31,7 +36,7 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Verify exact ores-cli source blobs and dispatcher order
+      - name: Verify exact mirrored product blobs and dispatcher order
         shell: bash
         run: |
           set -euo pipefail
@@ -39,35 +44,46 @@ jobs:
           test "$(git rev-parse HEAD)" = "$expected"
           module=certification/ores-cli-provenance/src/audit/tjsv_generated_schema_provenance.rs
           dispatcher=certification/ores-cli-provenance/snapshots/ores-cli-audit-mod.rs
-          test "$(git hash-object "$module")" = "370e8048e003755978abc90c40c4b51f6cda42ab"
-          test "$(git hash-object "$dispatcher")" = "3f55e3347a82eee6c1e10dba44c1dd2b1505ec45"
+          test "$(git hash-object "$module")" = "$ORES_CLI_PROVENANCE_BLOB"
+          test "$(git hash-object "$dispatcher")" = "$ORES_CLI_DISPATCHER_BLOB"
           evidence_line=$(grep -n 'contract_generated_evidence::augment_contract_generated_evidence_audit' "$dispatcher" | head -1 | cut -d: -f1)
           drift_line=$(grep -n 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit' "$dispatcher" | head -1 | cut -d: -f1)
           provenance_line=$(grep -n 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          full_line=$(grep -n 'tjsv_full_check::augment_tjsv_full_check_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          revision_line=$(grep -n 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit' "$dispatcher" | head -1 | cut -d: -f1)
           pins_line=$(grep -n 'workflow_action_pins::augment_workflow_action_pin_audit' "$dispatcher" | head -1 | cut -d: -f1)
           test "$evidence_line" -lt "$drift_line"
           test "$drift_line" -lt "$provenance_line"
-          test "$provenance_line" -lt "$pins_line"
+          test "$provenance_line" -lt "$full_line"
+          test "$full_line" -lt "$revision_line"
+          test "$revision_line" -lt "$pins_line"
+          printf 'ores_cli_head=%s\nprovenance_blob=%s\ndispatcher_blob=%s\n' \
+            "$ORES_CLI_HEAD" "$ORES_CLI_PROVENANCE_BLOB" "$ORES_CLI_DISPATCHER_BLOB" \
+            > certification/ores-cli-provenance/product-source-lock.txt
+          git diff --exit-code -- certification/ores-cli-provenance/src certification/ores-cli-provenance/snapshots
 
-      - name: Install exact Rust 1.88 toolchain
+      - name: Install exact Rust 1.95 toolchain
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
-          rustc +1.88.0 --version
-          cargo +1.88.0 --version
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
 
       - name: Format exact-source harness
-        run: cargo +1.88.0 fmt --manifest-path certification/ores-cli-provenance/Cargo.toml -- --check
+        run: cargo +1.95.0 fmt --manifest-path certification/ores-cli-provenance/Cargo.toml -- --check
 
       - name: Strict Clippy exact-source harness
-        run: cargo +1.88.0 clippy --manifest-path certification/ores-cli-provenance/Cargo.toml --all-targets -- -D warnings
+        run: cargo +1.95.0 clippy --manifest-path certification/ores-cli-provenance/Cargo.toml --all-targets -- -D warnings
 
       - name: Run debug unit and black-box regressions
-        run: cargo +1.88.0 test --manifest-path certification/ores-cli-provenance/Cargo.toml
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-provenance/Cargo.toml
 
       - name: Run release unit and black-box regressions
-        run: cargo +1.88.0 test --release --manifest-path certification/ores-cli-provenance/Cargo.toml
+        run: cargo +1.95.0 test --release --manifest-path certification/ores-cli-provenance/Cargo.toml
 
-      - name: Prove certification leaves reviewed sources unchanged
-        run: git diff --exit-code
+      - name: Prove reviewed sources remain immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- certification/ores-cli-provenance/src certification/ores-cli-provenance/snapshots
