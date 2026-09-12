@@ -20,9 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_HEAD: f8f24185ddb262437b42bf9161539a7f9cae7b9e
+  ORES_CLI_HEAD: a227ea512273db1fa23fe8908d222a2be1246c14
   ORES_CLI_PROVENANCE_BLOB: 370e8048e003755978abc90c40c4b51f6cda42ab
-  ORES_CLI_DISPATCHER_BLOB: 69e4d6bdab3d2d32dc86588dd3530f919da17857
+  ORES_CLI_DISPATCHER_BLOB: 81b07ef34d3bd6424924f63ab6cedb4ecbad50d6
 
 jobs:
   exact-source-rust:
@@ -47,15 +47,19 @@ jobs:
           test "$(git hash-object "$module")" = "$ORES_CLI_PROVENANCE_BLOB"
           test "$(git hash-object "$dispatcher")" = "$ORES_CLI_DISPATCHER_BLOB"
           evidence_line=$(grep -n 'contract_generated_evidence::augment_contract_generated_evidence_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          oauth_line=$(grep -n 'oauth_provider_contract::augment_oauth_provider_contract_audit' "$dispatcher" | head -1 | cut -d: -f1)
           drift_line=$(grep -n 'tjsv_bidirectional_drift::augment_tjsv_bidirectional_drift_audit' "$dispatcher" | head -1 | cut -d: -f1)
           provenance_line=$(grep -n 'tjsv_generated_schema_provenance::augment_tjsv_generated_schema_provenance_audit' "$dispatcher" | head -1 | cut -d: -f1)
           full_line=$(grep -n 'tjsv_full_check::augment_tjsv_full_check_audit' "$dispatcher" | head -1 | cut -d: -f1)
+          scope_line=$(grep -n 'tjsv_invocation_scope::augment_tjsv_invocation_scope_audit' "$dispatcher" | head -1 | cut -d: -f1)
           revision_line=$(grep -n 'tjsv_workflow_revision::augment_tjsv_workflow_revision_audit' "$dispatcher" | head -1 | cut -d: -f1)
           pins_line=$(grep -n 'workflow_action_pins::augment_workflow_action_pin_audit' "$dispatcher" | head -1 | cut -d: -f1)
-          test "$evidence_line" -lt "$drift_line"
+          test "$evidence_line" -lt "$oauth_line"
+          test "$oauth_line" -lt "$drift_line"
           test "$drift_line" -lt "$provenance_line"
           test "$provenance_line" -lt "$full_line"
-          test "$full_line" -lt "$revision_line"
+          test "$full_line" -lt "$scope_line"
+          test "$scope_line" -lt "$revision_line"
           test "$revision_line" -lt "$pins_line"
           printf 'ores_cli_head=%s\nprovenance_blob=%s\ndispatcher_blob=%s\n' \
             "$ORES_CLI_HEAD" "$ORES_CLI_PROVENANCE_BLOB" "$ORES_CLI_DISPATCHER_BLOB" \
