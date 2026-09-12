@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shared-auth-test/contract-conformance-tests/contracts/credential-policy/authored.schema.json",
+  "$defs": {
+    "CredentialPolicyV1": {
+      "$id": "CredentialPolicyV1",
+      "type": "object",
+      "properties": {
+        "version": { "type": "integer", "minimum": 1, "maximum": 1 },
+        "issuer": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "session_ttl_seconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "passkey_required": { "type": "boolean" }
+      },
+      "required": ["version", "issuer", "audience", "session_ttl_seconds", "passkey_required"],
+      "unevaluatedProperties": false
+    }
+  }
+}
