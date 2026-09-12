@@ -1,0 +1,114 @@
+name: TJSV independent peer-authority conformance
+
+on:
+  pull_request:
+    paths:
+      - "contracts/tjsv-peer-authority/**"
+      - ".github/workflows/tjsv-peer-authority.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/tjsv-peer-authority/**"
+      - ".github/workflows/tjsv-peer-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  peer-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact candidate
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up tested Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.16.0
+      - name: Transpile TypeSpec and compare independent JSON Schema authority
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: contracts/tjsv-peer-authority/main.tsp
+          schema: contracts/tjsv-peer-authority/authored.schema.json
+          report: .typespec-json-schema-validator/pass/report.json
+          sarif: .typespec-json-schema-validator/pass/report.sarif
+          contract_ir: .typespec-json-schema-validator/pass/contract-ir.json
+          output_dir: .typespec-json-schema-validator/pass/generated
+          max_probes: "64"
+      - name: Verify current evidence and nineteen refusal regressions
+        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          contract_ir: .typespec-json-schema-validator/pass/contract-ir.json
+          report: .typespec-json-schema-validator/pass/report.json
+          typespec: contracts/tjsv-peer-authority/main.tsp
+          schema: contracts/tjsv-peer-authority/authored.schema.json
+          generated_schema: .typespec-json-schema-validator/pass/generated/typespec.generated.schema.json
+          expected_declarations: '["ExternalPeer.ExternalPeerContract"]'
+          verification: .typespec-json-schema-validator/pass/verification.json
+      - name: Prepare TypeSpec-only drift copy
+        run: |
+          set -euo pipefail
+          mkdir -p .typespec-json-schema-validator/typespec-drift/source
+          sed 's/repository: string;/repository: boolean;/' contracts/tjsv-peer-authority/main.tsp > .typespec-json-schema-validator/typespec-drift/source/main.tsp
+      - name: TypeSpec-only drift must stop parity
+        id: typespec_drift
+        continue-on-error: true
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: .typespec-json-schema-validator/typespec-drift/source/main.tsp
+          schema: contracts/tjsv-peer-authority/authored.schema.json
+          report: .typespec-json-schema-validator/typespec-drift/report.json
+          contract_ir: .typespec-json-schema-validator/typespec-drift/contract-ir.json
+          output_dir: .typespec-json-schema-validator/typespec-drift/generated
+          max_probes: "64"
+      - name: Assert TypeSpec-only drift was rejected
+        env:
+          OUTCOME: ${{ steps.typespec_drift.outcome }}
+        run: test "$OUTCOME" = failure
+      - name: Prepare JSON-Schema-only drift copy
+        run: |
+          set -euo pipefail
+          mkdir -p .typespec-json-schema-validator/json-drift/source
+          cp contracts/tjsv-peer-authority/authored.schema.json .typespec-json-schema-validator/json-drift/source/authored.schema.json
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = '.typespec-json-schema-validator/json-drift/source/authored.schema.json';
+          const schema = JSON.parse(await readFile(path, 'utf8'));
+          schema.$defs.ExternalPeerContract.properties.repository.type = 'boolean';
+          await writeFile(path, `${JSON.stringify(schema, null, 2)}\n`);
+          NODE
+      - name: JSON-Schema-only drift must stop parity
+        id: json_schema_drift
+        continue-on-error: true
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: contracts/tjsv-peer-authority/main.tsp
+          schema: .typespec-json-schema-validator/json-drift/source/authored.schema.json
+          report: .typespec-json-schema-validator/json-drift/report.json
+          contract_ir: .typespec-json-schema-validator/json-drift/contract-ir.json
+          output_dir: .typespec-json-schema-validator/json-drift/generated
+          max_probes: "64"
+      - name: Assert JSON-Schema-only drift was rejected
+        env:
+          OUTCOME: ${{ steps.json_schema_drift.outcome }}
+        run: test "$OUTCOME" = failure
+      - name: Verify authored peer authorities are immutable
+        run: git diff --exit-code -- contracts/tjsv-peer-authority
+      - name: Retain diagnostic evidence
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tjsv-peer-authority-${{ github.run_id }}
+          path: .typespec-json-schema-validator/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
