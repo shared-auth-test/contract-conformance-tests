@@ -1,0 +1,24 @@
+{
+  "version": "2026-09-12",
+  "capabilities": [
+    {
+      "feature": "Passwordless sign-in",
+      "category": "core_auth",
+      "status": "implemented",
+      "sourceRepository": "shared-auth/shared-auth-api-server.rs",
+      "sourceRevision": "reviewed-commit-sha",
+      "tests": [
+        "magic-link-valid",
+        "magic-link-expired"
+      ]
+    },
+    {
+      "feature": "Directory synchronization",
+      "category": "directory_provisioning",
+      "status": "blocked",
+      "sourceRepository": "shared-auth/shared-auth-admin-api-server.rs",
+      "sourceRevision": "reviewed-commit-sha",
+      "tests": []
+    }
+  ]
+}

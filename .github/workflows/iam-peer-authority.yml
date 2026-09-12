@@ -1,0 +1,165 @@
+name: IAM peer-authority matrix
+
+on:
+  pull_request:
+    paths:
+      - "contracts/iam-capability/**"
+      - "scripts/assert_iam_peer_authority.mjs"
+      - ".github/workflows/iam-peer-authority.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/iam-capability/**"
+      - "scripts/assert_iam_peer_authority.mjs"
+      - ".github/workflows/iam-peer-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iam-peer-authority-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TSJSV_SHA: 93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+  TSJSV_ROOT: .typespec-json-schema-validator/iam-capability
+  EXPECTED_DECLARATIONS: '["SharedAuth.Iam.CapabilityCatalog","SharedAuth.Iam.CapabilityCategory","SharedAuth.Iam.CapabilityEvidence","SharedAuth.Iam.CapabilityStatus"]'
+
+jobs:
+  parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact candidate revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.16.0
+          package-manager-cache: false
+
+      - name: Compile TypeSpec and compare independent peer authorities
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: contracts/iam-capability/main.tsp
+          schema: contracts/iam-capability/authored.schema.json
+          report: .typespec-json-schema-validator/iam-capability/report.json
+          sarif: .typespec-json-schema-validator/iam-capability/report.sarif
+          contract_ir: .typespec-json-schema-validator/iam-capability/contract-ir.json
+          output_dir: .typespec-json-schema-validator/iam-capability/generated
+          instances: contracts/iam-capability/instances
+          max_probes: "96"
+          int64_strategy: string
+          seal_object_schemas: "true"
+          polymorphic_models_strategy: oneOf
+          quiet: "true"
+
+      - name: Recompute current-input Contract IR and complete consumer scope
+        uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          contract_ir: .typespec-json-schema-validator/iam-capability/contract-ir.json
+          report: .typespec-json-schema-validator/iam-capability/report.json
+          typespec: contracts/iam-capability/main.tsp
+          schema: contracts/iam-capability/authored.schema.json
+          generated_schema: .typespec-json-schema-validator/iam-capability/generated/typespec.generated.schema.json
+          expected_declarations: '["SharedAuth.Iam.CapabilityCatalog","SharedAuth.Iam.CapabilityCategory","SharedAuth.Iam.CapabilityEvidence","SharedAuth.Iam.CapabilityStatus"]'
+          verification: .typespec-json-schema-validator/iam-capability/consumer-verification.json
+
+      - name: Assert first-class authority, corpus, and receipt invariants
+        run: node scripts/assert_iam_peer_authority.mjs
+
+      - name: Check out the exact validator for negative controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/typespec-json-schema-validator
+          ref: 93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+          path: .tjsv-negative
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install the exact negative-control toolchain
+        run: npm ci --prefix .tjsv-negative --omit=dev
+
+      - name: Prove enum and requiredness drift fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="${RUNNER_TEMP}/shared-auth-iam-drift"
+          rm -rf "$tmp"
+          mkdir -p "$tmp"
+
+          cp contracts/iam-capability/authored.schema.json "$tmp/enum-drift.schema.json"
+          node --input-type=module - "$tmp/enum-drift.schema.json" <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = process.argv[2];
+          const schema = JSON.parse(await readFile(path, 'utf8'));
+          schema.$defs.CapabilityStatus.enum = schema.$defs.CapabilityStatus.enum
+            .filter((value) => value !== 'blocked');
+          await writeFile(path, `${JSON.stringify(schema, null, 2)}\n`);
+          NODE
+
+          set +e
+          node .tjsv-negative/bin/typespec-json-schema-validator.mjs check \
+            --typespec=contracts/iam-capability/main.tsp \
+            --schema="$tmp/enum-drift.schema.json" \
+            --instances=contracts/iam-capability/instances \
+            --output-dir="$tmp/enum-generated" \
+            --report="$tmp/enum-report.json" \
+            --quiet
+          enum_code=$?
+          set -e
+          test "$enum_code" -eq 2
+          jq -e '
+            .status == "stopped_for_evaluation"
+            and .zeroUnexplainedFindings == false
+            and (.findings | length) > 0
+          ' "$tmp/enum-report.json" >/dev/null
+
+          cp contracts/iam-capability/main.tsp "$tmp/requiredness-drift.tsp"
+          node --input-type=module - "$tmp/requiredness-drift.tsp" <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = process.argv[2];
+          const source = await readFile(path, 'utf8');
+          const changed = source.replace(
+            'status: CapabilityStatus;',
+            'status?: CapabilityStatus;',
+          );
+          if (changed === source) throw new Error('requiredness mutation did not apply');
+          await writeFile(path, changed);
+          NODE
+
+          set +e
+          node .tjsv-negative/bin/typespec-json-schema-validator.mjs check \
+            --typespec="$tmp/requiredness-drift.tsp" \
+            --schema=contracts/iam-capability/authored.schema.json \
+            --instances=contracts/iam-capability/instances \
+            --output-dir="$tmp/requiredness-generated" \
+            --report="$tmp/requiredness-report.json" \
+            --quiet
+          requiredness_code=$?
+          set -e
+          test "$requiredness_code" -eq 2
+          jq -e '
+            .status == "stopped_for_evaluation"
+            and .zeroUnexplainedFindings == false
+            and (.findings | length) > 0
+          ' "$tmp/requiredness-report.json" >/dev/null
+
+      - name: Prove authored authorities were never rewritten
+        run: |
+          git diff --exit-code -- \
+            contracts/iam-capability/main.tsp \
+            contracts/iam-capability/authored.schema.json \
+            contracts/iam-capability/instances

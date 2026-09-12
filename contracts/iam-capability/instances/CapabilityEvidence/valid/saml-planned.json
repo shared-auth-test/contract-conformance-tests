@@ -1,0 +1,8 @@
+{
+  "feature": "SAML enterprise SSO",
+  "category": "enterprise_sso",
+  "status": "planned",
+  "sourceRepository": "shared-auth/shared-auth-interfaces",
+  "sourceRevision": "reviewed-commit-sha",
+  "tests": []
+}

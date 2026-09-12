@@ -12,6 +12,8 @@ tmp/temp/
 tmp/worktrees/
 # <<< ores fleet hygiene <<<
 
+.typespec-json-schema-validator/
+.tjsv-negative/
 canaries/shared-auth-site/.astro/
 canaries/shared-auth-site/dist/
 canaries/shared-auth-site/node_modules/

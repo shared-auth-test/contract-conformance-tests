@@ -1,0 +1,7 @@
+{
+  "feature": "SCIM provisioning",
+  "category": "directory_provisioning",
+  "sourceRepository": "shared-auth/shared-auth-admin-api-server.rs",
+  "sourceRevision": "reviewed-commit-sha",
+  "tests": []
+}

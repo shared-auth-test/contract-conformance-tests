@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared-auth.iam-capabilities.schema.json",
+  "$defs": {
+    "CapabilityStatus": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CapabilityStatus",
+      "type": "string",
+      "enum": [
+        "implemented",
+        "partial",
+        "planned",
+        "blocked"
+      ]
+    },
+    "CapabilityCategory": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CapabilityCategory",
+      "type": "string",
+      "enum": [
+        "core_auth",
+        "multi_factor",
+        "passkeys",
+        "organizations",
+        "enterprise_sso",
+        "directory_provisioning",
+        "lifecycle",
+        "policy_risk_audit",
+        "branding_localization"
+      ]
+    },
+    "CapabilityEvidence": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CapabilityEvidence",
+      "type": "object",
+      "properties": {
+        "feature": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "CapabilityCategory"
+        },
+        "status": {
+          "$ref": "CapabilityStatus"
+        },
+        "sourceRepository": {
+          "type": "string"
+        },
+        "sourceRevision": {
+          "type": "string"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "feature",
+        "category",
+        "status",
+        "sourceRepository",
+        "sourceRevision",
+        "tests"
+      ],
+      "unevaluatedProperties": false
+    },
+    "CapabilityCatalog": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CapabilityCatalog",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "CapabilityEvidence"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "capabilities"
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
