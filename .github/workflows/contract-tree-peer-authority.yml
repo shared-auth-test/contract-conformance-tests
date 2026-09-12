@@ -1,0 +1,100 @@
+name: Shared Auth whole-tree peer-authority convergence
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/contract-tree-peer-authority.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/contract-tree-peer-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tree-completeness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact candidate revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Require complete independent peer-authority homes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('contracts')
+          generated_names = {
+              'typespec.generated.schema.json',
+              'generated.schema.json',
+          }
+          homes = {}
+          for path in root.rglob('*'):
+              if not path.is_file() or path.is_symlink():
+                  continue
+              parts = set(path.parts)
+              if {'generated', '.typespec-json-schema-validator'} & parts:
+                  continue
+              kind = None
+              home = None
+              if path.name == 'main.tsp':
+                  kind = 'typespec'
+                  home = path.parent.parent if path.parent.name == 'typespec' else path.parent
+              elif path.name == 'authored.schema.json':
+                  kind = 'json-schema'
+                  home = path.parent.parent if path.parent.name == 'json-schema' else path.parent
+              elif path.parent.name == 'json-schema' and path.name.endswith('.schema.json'):
+                  if path.name in generated_names or path.name.endswith('.generated.schema.json'):
+                      continue
+                  kind = 'json-schema'
+                  home = path.parent.parent
+              if kind is None:
+                  continue
+              lane = homes.setdefault(home, {'typespec': [], 'json-schema': []})
+              lane[kind].append(path)
+
+          assert len(homes) >= 2, f'expected at least two contract homes, found {len(homes)}'
+          failures = []
+          for home, lanes in sorted(homes.items(), key=lambda item: str(item[0])):
+              for kind in ('typespec', 'json-schema'):
+                  if len(lanes[kind]) != 1:
+                      failures.append(f'{home}: expected exactly one {kind} authority, found {len(lanes[kind])}')
+              print(f'{home}: TypeSpec={lanes["typespec"]} JSON-Schema={lanes["json-schema"]}')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print(f'complete peer-authority homes: {len(homes)}')
+          PY
+
+  credential-policy:
+    needs: tree-completeness
+    uses: flags-2-env-test/contract-conformance-tests/.github/workflows/peer-authority-convergence.yml@ffaaa6bb025de65ea4440d78c61722adc94ac090
+    with:
+      typespec_path: contracts/credential-policy/main.tsp
+      schema_path: contracts/credential-policy/authored.schema.json
+      instances_path: contracts/credential-policy/instances
+      expected_declarations_json: '["SharedAuthCredentialPolicy.CredentialPolicyV1"]'
+
+  iam-capability:
+    needs: tree-completeness
+    uses: flags-2-env-test/contract-conformance-tests/.github/workflows/peer-authority-convergence.yml@ffaaa6bb025de65ea4440d78c61722adc94ac090
+    with:
+      typespec_path: contracts/iam-capability/main.tsp
+      schema_path: contracts/iam-capability/authored.schema.json
+      instances_path: contracts/iam-capability/instances
+      expected_declarations_json: '["SharedAuth.Iam.CapabilityCatalog","SharedAuth.Iam.CapabilityCategory","SharedAuth.Iam.CapabilityEvidence","SharedAuth.Iam.CapabilityStatus"]'
