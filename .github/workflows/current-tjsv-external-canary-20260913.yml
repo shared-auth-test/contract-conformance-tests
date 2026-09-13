@@ -1,0 +1,37 @@
+name: Current TJSV external peer-authority canary
+on:
+  pull_request:
+    paths: ['.github/workflows/current-tjsv-external-canary-20260913.yml']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/current-tjsv-external-canary-20260913.yml']
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  peer-authority:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { ref: '${{ github.event.pull_request.head.sha || github.sha }}', persist-credentials: false }
+      - name: Verify exact candidate
+        env: { EXPECTED_SHA: '${{ github.event.pull_request.head.sha || github.sha }}' }
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { repository: '3fa-app-test/contract-conformance-tests', ref: '1236fd3359cb0d4f7a1b66bf688f5067af3a15ec', path: canary-source, persist-credentials: false }
+      - uses: ORESoftware/typespec-json-schema-validator@a952c53b4628b1d12e21ed51879d910a8c19a581
+        with:
+          typespec: canary-source/contracts/auth-factor-policy/main.tsp
+          schema: canary-source/contracts/auth-factor-policy/authored.schema.json
+          instances: canary-source/contracts/auth-factor-policy/instances
+          report: .typespec-json-schema-validator/canary/report.json
+          contract_ir: .typespec-json-schema-validator/canary/contract-ir.json
+          output_dir: .typespec-json-schema-validator/canary/generated
+      - uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@a952c53b4628b1d12e21ed51879d910a8c19a581
+        with:
+          contract_ir: .typespec-json-schema-validator/canary/contract-ir.json
+          report: .typespec-json-schema-validator/canary/report.json
+          typespec: canary-source/contracts/auth-factor-policy/main.tsp
+          schema: canary-source/contracts/auth-factor-policy/authored.schema.json
+          generated_schema: .typespec-json-schema-validator/canary/generated/typespec.generated.schema.json
+          expected_declarations: '["ThreeFaAuthFactorPolicy.AuthFactorPolicyV1"]'
+      - run: jq -e '.status == "passed" and .zeroUnexplainedFindings == true and .authorities.precedence == "none"' .typespec-json-schema-validator/canary/report.json >/dev/null
