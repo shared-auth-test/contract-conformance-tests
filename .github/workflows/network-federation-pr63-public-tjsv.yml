@@ -1,0 +1,179 @@
+name: Shared Auth network federation public TJSV certificate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/network-federation-pr63-public-tjsv.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-federation-pr63-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: be30b24eabe813bd0165fde398677c45852ce71c
+  TYPESPEC_BLOB: 5c422d4014468ddca41f16fd49a44bb3301a24d0
+  TJSV_REV: 93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+
+jobs:
+  peer-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact public certificate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out exact private interface candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: shared-auth/shared-auth-interfaces
+          ref: ${{ env.PRODUCT_HEAD }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          path: private-interfaces
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact candidate and authored source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-interfaces rev-parse HEAD)" = "$PRODUCT_HEAD"
+          test "$(git -C private-interfaces rev-parse HEAD:contracts/network-federation/main.tsp)" = "$TYPESPEC_BLOB"
+          test -f private-interfaces/contracts/network-federation/authored.schema.json
+          test -d private-interfaces/contracts/network-federation/instances
+          grep -Fq 'independent peer authorities' private-interfaces/contracts/network-federation/main.tsp
+          grep -Fq 'JSON Schema emitted from this file is comparison evidence only' private-interfaces/contracts/network-federation/main.tsp
+
+      - name: Set up tested Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.16.0
+
+      - name: Compile TypeSpec to Schema B and compare authored JSON Schema A
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: private-interfaces/contracts/network-federation/main.tsp
+          schema: private-interfaces/contracts/network-federation/authored.schema.json
+          instances: private-interfaces/contracts/network-federation/instances
+          report: .typespec-json-schema-validator/network-federation/report.json
+          sarif: .typespec-json-schema-validator/network-federation/report.sarif
+          contract_ir: .typespec-json-schema-validator/network-federation/contract-ir.json
+          output_dir: .typespec-json-schema-validator/network-federation/generated
+          max_probes: '96'
+
+      - name: Verify passed receipt and no authority precedence
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('.typespec-json-schema-validator/network-federation/report.json', 'utf8'));
+          const ir = JSON.parse(readFileSync('.typespec-json-schema-validator/network-federation/contract-ir.json', 'utf8'));
+          const sha256 = /^[a-f0-9]{64}$/;
+          assert.equal(report.schema, 'ores.typespec-json-schema-validator.report/v1');
+          assert.equal(report.status, 'passed');
+          assert.equal(report.zeroUnexplainedFindings, true);
+          assert.deepEqual(report.findings, []);
+          assert.match(report.runId, sha256);
+          assert.equal(ir.schema, 'ores.typespec-json-schema-validator.contract-ir/v1');
+          assert.equal(ir.status, 'passed');
+          assert.equal(ir.admissible, true);
+          assert.equal(ir.editableAuthority, false);
+          assert.deepEqual(ir.authorities, {
+            typespec: 'independently-authored',
+            jsonSchema: 'independently-authored',
+            generatedJsonSchema: 'comparison-evidence-only',
+            precedence: 'none',
+          });
+          assert.equal(ir.admission.receipt.runId, report.runId);
+          assert.equal(ir.admission.receipt.zeroUnexplainedFindings, true);
+          assert.ok(ir.admission.scope.admittedDeclarations >= 8);
+          NODE
+
+      - name: Prepare TypeSpec-only drift copy
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/typespec-drift"
+          sed 's/provider_id: string;/provider_id: boolean;/' \
+            private-interfaces/contracts/network-federation/main.tsp \
+            > "$RUNNER_TEMP/typespec-drift/main.tsp"
+          test "$(grep -c 'provider_id: boolean;' "$RUNNER_TEMP/typespec-drift/main.tsp")" -ge 1
+
+      - name: TypeSpec-only drift must fail admission
+        id: tsp_drift
+        continue-on-error: true
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: ${{ runner.temp }}/typespec-drift/main.tsp
+          schema: private-interfaces/contracts/network-federation/authored.schema.json
+          report: .typespec-json-schema-validator/typespec-drift/report.json
+          contract_ir: .typespec-json-schema-validator/typespec-drift/contract-ir.json
+          output_dir: .typespec-json-schema-validator/typespec-drift/generated
+          max_probes: '64'
+
+      - name: Assert TypeSpec-only drift rejected
+        env:
+          OUTCOME: ${{ steps.tsp_drift.outcome }}
+        run: test "$OUTCOME" = failure
+
+      - name: Prepare JSON-Schema-only drift copy
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/json-drift"
+          cp private-interfaces/contracts/network-federation/authored.schema.json "$RUNNER_TEMP/json-drift/authored.schema.json"
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = process.env.RUNNER_TEMP + '/json-drift/authored.schema.json';
+          const schema = JSON.parse(await readFile(path, 'utf8'));
+          let changed = 0;
+          const visit = value => {
+            if (!value || typeof value !== 'object') return;
+            if (value.properties?.provider_id?.type === 'string') {
+              value.properties.provider_id.type = 'boolean';
+              changed += 1;
+            }
+            for (const child of Object.values(value)) visit(child);
+          };
+          visit(schema);
+          if (changed < 1) throw new Error('provider_id string property not found');
+          await writeFile(path, JSON.stringify(schema, null, 2) + '\n');
+          NODE
+
+      - name: JSON-Schema-only drift must fail admission
+        id: json_drift
+        continue-on-error: true
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: private-interfaces/contracts/network-federation/main.tsp
+          schema: ${{ runner.temp }}/json-drift/authored.schema.json
+          report: .typespec-json-schema-validator/json-drift/report.json
+          contract_ir: .typespec-json-schema-validator/json-drift/contract-ir.json
+          output_dir: .typespec-json-schema-validator/json-drift/generated
+          max_probes: '64'
+
+      - name: Assert JSON-Schema-only drift rejected
+        env:
+          OUTCOME: ${{ steps.json_drift.outcome }}
+        run: test "$OUTCOME" = failure
+
+      - name: Verify authored peers and fixtures were never rewritten
+        run: git -C private-interfaces diff --exit-code -- contracts/network-federation
+
+      - name: Retain semantic evidence
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: network-federation-pr63-${{ github.run_id }}
+          path: .typespec-json-schema-validator/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
