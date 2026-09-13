@@ -1,0 +1,10 @@
+{
+  "schema": "ores.test-org-exact-source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 279,
+  "head": "47e30e4f00bf160191cc5190c24c2b8102d87369",
+  "files": {
+    "src/audit/oauth_provider_test_source_pins.rs": "ed4a694d4bd7386003b8506b479931f86fb200b6",
+    "src/audit/mod.rs": "d280afc21200fdfa466aab53e6afb0a8359cf582"
+  }
+}
