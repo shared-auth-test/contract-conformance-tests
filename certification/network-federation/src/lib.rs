@@ -4,19 +4,26 @@
 //! server and interface PR heads under review. These tests intentionally avoid
 //! production endpoints, credentials, cookies, and provider data.
 
+#[cfg(test)]
 use std::collections::BTreeMap;
 
+#[cfg(test)]
 const SERVER_SQL: &str = include_str!("../snapshots/network-federation.sql");
+#[cfg(test)]
 const INTERFACES_TSP: &str = include_str!("../snapshots/network-federation.tsp");
+#[cfg(test)]
 const SERVER_LOCK: &str = include_str!("../server-source-lock.json");
+#[cfg(test)]
 const INTERFACES_LOCK: &str = include_str!("../interfaces-source-lock.json");
 
+#[cfg(test)]
 #[derive(Default)]
 struct PairwiseRegistry {
     next: usize,
     rows: BTreeMap<(String, String), String>,
 }
 
+#[cfg(test)]
 impl PairwiseRegistry {
     fn resolve(&mut self, sector_id: &str, principal_id: &str) -> String {
         let key = (sector_id.to_owned(), principal_id.to_owned());
@@ -30,6 +37,7 @@ impl PairwiseRegistry {
     }
 }
 
+#[cfg(test)]
 fn model_body<'a>(source: &'a str, model: &str) -> &'a str {
     let marker = format!("model {model} {{");
     let start = source.find(&marker).expect("model must exist") + marker.len();
@@ -88,7 +96,10 @@ mod tests {
             "provider_tenant: string;",
             "provider_subject: string;",
         ] {
-            assert!(evidence.contains(required), "missing immutable identity field: {required}");
+            assert!(
+                evidence.contains(required),
+                "missing immutable identity field: {required}"
+            );
         }
         assert!(evidence.contains("verified_email?: string;"));
     }
@@ -104,9 +115,11 @@ mod tests {
 
     #[test]
     fn each_client_has_one_explicit_sector_and_each_sector_principal_has_one_subject() {
-        assert!(SERVER_SQL.contains("create table if not exists shared_auth.oauth_client_subject_sectors"));
+        assert!(SERVER_SQL
+            .contains("create table if not exists shared_auth.oauth_client_subject_sectors"));
         assert!(SERVER_SQL.contains("client_id           text        primary key"));
-        assert!(SERVER_SQL.contains("create table if not exists shared_auth.sector_pairwise_subjects"));
+        assert!(SERVER_SQL
+            .contains("create table if not exists shared_auth.sector_pairwise_subjects"));
         assert!(SERVER_SQL.contains("primary key (sector_id, shared_user_id)"));
         assert!(SERVER_SQL.contains("subject             text        not null unique"));
     }
