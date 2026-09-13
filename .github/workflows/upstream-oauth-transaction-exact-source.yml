@@ -1,0 +1,94 @@
+name: Shared Auth upstream OAuth transaction exact-source certification
+
+on:
+  pull_request:
+    paths:
+      - 'certification/upstream-oauth-transaction/**'
+      - '.github/workflows/upstream-oauth-transaction-exact-source.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'certification/upstream-oauth-transaction/**'
+      - '.github/workflows/upstream-oauth-transaction-exact-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-oauth-transaction-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: 35d6c5347ca1dd0ef694cf1eb6f5c183170a62b0
+  PRODUCT_SOURCE_BLOB: d0171656cb3b85a9f4484c7574dbd3070ca1b98f
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact certificate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact product-source lock and mirrored blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected"
+          source=certification/upstream-oauth-transaction/src/lib.rs
+          test "$(git hash-object "$source")" = "$PRODUCT_SOURCE_BLOB"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const lock = JSON.parse(readFileSync('certification/upstream-oauth-transaction/product-source-lock.json', 'utf8'));
+          assert.equal(lock.schema, 'ores.test-org-exact-source-lock/v1');
+          assert.equal(lock.repository, 'shared-auth/shared-auth-server.rs');
+          assert.equal(lock.pullRequest, 142);
+          assert.equal(lock.head, process.env.PRODUCT_HEAD);
+          assert.equal(lock.files['src/upstream_oauth_transaction.rs'], process.env.PRODUCT_SOURCE_BLOB);
+          assert.deepEqual(lock.mergeParents, [
+            '83e32e5fcfcacd72e51a95a1988a194ca5991e5d',
+            '3ab845a667ad537dfb45eab49012c55561ea6666',
+          ]);
+          NODE
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
+
+      - name: Rustfmt exact source
+        run: cargo +1.95.0 fmt --manifest-path certification/upstream-oauth-transaction/Cargo.toml -- --check
+
+      - name: Strict Clippy exact source
+        run: cargo +1.95.0 clippy --manifest-path certification/upstream-oauth-transaction/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run debug regressions
+        run: cargo +1.95.0 test --manifest-path certification/upstream-oauth-transaction/Cargo.toml
+
+      - name: Run release regressions
+        run: cargo +1.95.0 test --release --manifest-path certification/upstream-oauth-transaction/Cargo.toml
+
+      - name: Assert hardening properties remain in the exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=certification/upstream-oauth-transaction/src/lib.rs
+          grep -Fq 'nonce_hash: [u8; 32]' "$source"
+          grep -Fq 'constant_time_eq' "$source"
+          grep -Fq 'upstream OAuth continuation must resume /oauth/authorize' "$source"
+          grep -Fq 'wrong_state_does_not_burn_valid_transaction' "$source"
+          grep -Fq 'callback_and_continuation_are_fail_closed' "$source"
+          grep -Fq 'UpstreamSecret([REDACTED])' "$source"
+
+      - name: Prove exact source was not rewritten
+        run: git diff --exit-code -- certification/upstream-oauth-transaction/src/lib.rs
