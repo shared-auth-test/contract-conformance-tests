@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: 22.16.0
       - name: Transpile TypeSpec and compare independent JSON Schema authority
-        uses: ORESoftware/typespec-json-schema-validator@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           typespec: contracts/tjsv-peer-authority/main.tsp
           schema: contracts/tjsv-peer-authority/authored.schema.json
@@ -44,7 +44,7 @@ jobs:
           output_dir: .typespec-json-schema-validator/pass/generated
           max_probes: "64"
       - name: Verify current evidence and nineteen refusal regressions
-        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           contract_ir: .typespec-json-schema-validator/pass/contract-ir.json
           report: .typespec-json-schema-validator/pass/report.json
@@ -61,7 +61,7 @@ jobs:
       - name: TypeSpec-only drift must stop parity
         id: typespec_drift
         continue-on-error: true
-        uses: ORESoftware/typespec-json-schema-validator@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           typespec: .typespec-json-schema-validator/typespec-drift/source/main.tsp
           schema: contracts/tjsv-peer-authority/authored.schema.json
@@ -88,7 +88,7 @@ jobs:
       - name: JSON-Schema-only drift must stop parity
         id: json_schema_drift
         continue-on-error: true
-        uses: ORESoftware/typespec-json-schema-validator@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           typespec: contracts/tjsv-peer-authority/main.tsp
           schema: .typespec-json-schema-validator/json-drift/source/authored.schema.json
