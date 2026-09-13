@@ -284,9 +284,9 @@ mod tests {
     fn rejects_evidence_without_authority_source_pin() {
         let evidence = valid().replace(
             &format!(
-                "  \"authoritySource\": {{\n    \"repository\": \"shared-auth/shared-auth-interfaces\",\n    \"commit\": \"{INTERFACES_SHA}\"\n  }}\n"
+                ",\n  \"authoritySource\": {{\n    \"repository\": \"shared-auth/shared-auth-interfaces\",\n    \"commit\": \"{INTERFACES_SHA}\"\n  }}\n"
             ),
-            "",
+            "\n",
         );
         let report = audit(&evidence);
         assert!(report.findings.iter().any(|finding| {
