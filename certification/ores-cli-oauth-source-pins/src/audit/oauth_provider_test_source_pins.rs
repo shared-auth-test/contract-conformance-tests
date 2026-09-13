@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::RepositoryAuditOptions;
 use crate::model::{CommandReport, Finding};
@@ -113,8 +113,7 @@ pub(super) fn augment_oauth_provider_test_source_pin_audit(
         );
         return report.finalize();
     };
-    if object.get("schema").and_then(Value::as_str)
-        != Some("ores.oauth-provider-test-evidence/v1")
+    if object.get("schema").and_then(Value::as_str) != Some("ores.oauth-provider-test-evidence/v1")
     {
         return report.finalize();
     }
@@ -275,9 +274,10 @@ mod tests {
             "",
         );
         let report = audit(&evidence);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "oauth-provider-test-provider-source-pin-missing"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "oauth-provider-test-provider-source-pin-missing" }));
     }
 
     #[test]
@@ -289,20 +289,23 @@ mod tests {
             "\n",
         );
         let report = audit(&evidence);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "oauth-provider-test-authority-source-pin-missing"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "oauth-provider-test-authority-source-pin-missing" }));
     }
 
     #[test]
     fn rejects_mutable_or_wrong_family_source_pins() {
-        let evidence = valid()
-            .replace(SERVER_SHA, "main")
-            .replace("shared-auth/shared-auth-interfaces", "shared-auth/shared-auth-clients");
+        let evidence = valid().replace(SERVER_SHA, "main").replace(
+            "shared-auth/shared-auth-interfaces",
+            "shared-auth/shared-auth-clients",
+        );
         let report = audit(&evidence);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == "oauth-provider-test-provider-source-pin-missing"
-        }));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.code == "oauth-provider-test-provider-source-pin-missing" }));
         assert!(report.findings.iter().any(|finding| {
             finding.code == "oauth-provider-test-authority-source-repository-invalid"
                 || finding.code == "oauth-provider-test-authority-source-pin-missing"
