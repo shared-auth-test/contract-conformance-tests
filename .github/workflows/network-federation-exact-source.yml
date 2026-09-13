@@ -1,0 +1,107 @@
+name: Shared Auth network federation exact-source certification
+
+on:
+  pull_request:
+    paths:
+      - 'certification/network-federation/**'
+      - '.github/workflows/network-federation-exact-source.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'certification/network-federation/**'
+      - '.github/workflows/network-federation-exact-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-federation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SERVER_HEAD: df6033dd7dba3b81b4e6c6c56de8f37b9675bc76
+  SERVER_SQL_BLOB: 75b97b587d6d68065bc862f43a6323e8daa5f4f0
+  SERVER_TEST_BLOB: 73dda80d6c43b043b9cfaa53ae0ecae8ed805abf
+  INTERFACES_HEAD: be30b24eabe813bd0165fde398677c45852ce71c
+  INTERFACES_TSP_BLOB: 5c422d4014468ddca41f16fd49a44bb3301a24d0
+  INTERFACES_SCHEMA_BLOB: 7dc4d3168a622bbcdaac6944b863bfbf3ae03926
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact certificate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact source locks and mirrored blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected"
+          sql=certification/network-federation/snapshots/network-federation.sql
+          tsp=certification/network-federation/snapshots/network-federation.tsp
+          test "$(git hash-object "$sql")" = "$SERVER_SQL_BLOB"
+          test "$(git hash-object "$tsp")" = "$INTERFACES_TSP_BLOB"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const server = JSON.parse(readFileSync('certification/network-federation/server-source-lock.json', 'utf8'));
+          const interfaces = JSON.parse(readFileSync('certification/network-federation/interfaces-source-lock.json', 'utf8'));
+          assert.equal(server.schema, 'ores.test-org-exact-source-lock/v1');
+          assert.equal(server.repository, 'shared-auth/shared-auth-server.rs');
+          assert.equal(server.pullRequest, 156);
+          assert.equal(server.head, process.env.SERVER_HEAD);
+          assert.equal(server.files['db/network-federation.sql'], process.env.SERVER_SQL_BLOB);
+          assert.equal(server.files['tests/network_federation_schema.rs'], process.env.SERVER_TEST_BLOB);
+          assert.equal(interfaces.schema, 'ores.test-org-exact-source-lock/v1');
+          assert.equal(interfaces.repository, 'shared-auth/shared-auth-interfaces');
+          assert.equal(interfaces.pullRequest, 63);
+          assert.equal(interfaces.head, process.env.INTERFACES_HEAD);
+          assert.equal(interfaces.files['contracts/network-federation/main.tsp'], process.env.INTERFACES_TSP_BLOB);
+          assert.equal(interfaces.files['contracts/network-federation/authored.schema.json'], process.env.INTERFACES_SCHEMA_BLOB);
+          NODE
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
+
+      - name: Rustfmt certification crate
+        run: cargo +1.95.0 fmt --manifest-path certification/network-federation/Cargo.toml -- --check
+
+      - name: Strict Clippy certification crate
+        run: cargo +1.95.0 clippy --manifest-path certification/network-federation/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run debug certification
+        run: cargo +1.95.0 test --manifest-path certification/network-federation/Cargo.toml
+
+      - name: Run release certification
+        run: cargo +1.95.0 test --release --manifest-path certification/network-federation/Cargo.toml
+
+      - name: Assert privacy and sector invariants remain visible
+        shell: bash
+        run: |
+          set -euo pipefail
+          sql=certification/network-federation/snapshots/network-federation.sql
+          tsp=certification/network-federation/snapshots/network-federation.tsp
+          grep -Fq 'primary key (sector_id, shared_user_id)' "$sql"
+          grep -Fq 'client_id           text        primary key' "$sql"
+          grep -Fq "where aa.status = 'active'" "$sql"
+          grep -Fq "c.status = 'active'" "$sql"
+          grep -Fq 's.active = true' "$sql"
+          grep -Fq 'subject_sector_id: string;' "$tsp"
+          grep -Fq 'subject_version: string;' "$tsp"
+          ! grep -Fq 'derivation_version' "$tsp"
+
+      - name: Prove mirrored source was not rewritten
+        run: git diff --exit-code -- certification/network-federation/snapshots

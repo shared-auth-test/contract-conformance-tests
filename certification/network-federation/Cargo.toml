@@ -1,0 +1,12 @@
+[package]
+name = "shared-auth-network-federation-cert"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+publish = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"

@@ -1,0 +1,10 @@
+{
+  "schema": "ores.test-org-exact-source-lock/v1",
+  "repository": "shared-auth/shared-auth-interfaces",
+  "pullRequest": 63,
+  "head": "be30b24eabe813bd0165fde398677c45852ce71c",
+  "files": {
+    "contracts/network-federation/main.tsp": "5c422d4014468ddca41f16fd49a44bb3301a24d0",
+    "contracts/network-federation/authored.schema.json": "7dc4d3168a622bbcdaac6944b863bfbf3ae03926"
+  }
+}
