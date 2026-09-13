@@ -1,0 +1,80 @@
+name: ORES CLI OAuth test source-pin certification
+
+on:
+  pull_request:
+    paths:
+      - 'certification/ores-cli-oauth-source-pins/**'
+      - '.github/workflows/ores-cli-oauth-source-pins.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'certification/ores-cli-oauth-source-pins/**'
+      - '.github/workflows/ores-cli-oauth-source-pins.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-oauth-source-pins-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORES_CLI_HEAD: a926e40712af12b662057b31217644ba943e2203
+  ORES_CLI_SOURCE_BLOB: 53fae7b9fee6fbcb1bccbbe010581da48ed9ea64
+  ORES_CLI_MOD_BLOB: d280afc21200fdfa466aab53e6afb0a8359cf582
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact product-source lock and mirrored blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected"
+          module=certification/ores-cli-oauth-source-pins/src/audit/oauth_provider_test_source_pins.rs
+          test "$(git hash-object "$module")" = "$ORES_CLI_SOURCE_BLOB"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const lock = JSON.parse(readFileSync('certification/ores-cli-oauth-source-pins/product-source-lock.json', 'utf8'));
+          assert.equal(lock.schema, 'ores.test-org-exact-source-lock/v1');
+          assert.equal(lock.repository, 'ORESoftware/ores-cli');
+          assert.equal(lock.pullRequest, 279);
+          assert.equal(lock.head, process.env.ORES_CLI_HEAD);
+          assert.equal(lock.files['src/audit/oauth_provider_test_source_pins.rs'], process.env.ORES_CLI_SOURCE_BLOB);
+          assert.equal(lock.files['src/audit/mod.rs'], process.env.ORES_CLI_MOD_BLOB);
+          NODE
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
+
+      - name: Format exact-source harness
+        run: cargo +1.95.0 fmt --manifest-path certification/ores-cli-oauth-source-pins/Cargo.toml -- --check
+
+      - name: Strict Clippy exact-source harness
+        run: cargo +1.95.0 clippy --manifest-path certification/ores-cli-oauth-source-pins/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run debug exact-source regressions
+        run: cargo +1.95.0 test --manifest-path certification/ores-cli-oauth-source-pins/Cargo.toml
+
+      - name: Run release exact-source regressions
+        run: cargo +1.95.0 test --release --manifest-path certification/ores-cli-oauth-source-pins/Cargo.toml
+
+      - name: Prove mirrored product source was not rewritten
+        run: git diff --exit-code -- certification/ores-cli-oauth-source-pins/src/audit/oauth_provider_test_source_pins.rs
