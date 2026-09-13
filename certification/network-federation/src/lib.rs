@@ -118,8 +118,9 @@ mod tests {
         assert!(SERVER_SQL
             .contains("create table if not exists shared_auth.oauth_client_subject_sectors"));
         assert!(SERVER_SQL.contains("client_id           text        primary key"));
-        assert!(SERVER_SQL
-            .contains("create table if not exists shared_auth.sector_pairwise_subjects"));
+        assert!(
+            SERVER_SQL.contains("create table if not exists shared_auth.sector_pairwise_subjects")
+        );
         assert!(SERVER_SQL.contains("primary key (sector_id, shared_user_id)"));
         assert!(SERVER_SQL.contains("subject             text        not null unique"));
     }
