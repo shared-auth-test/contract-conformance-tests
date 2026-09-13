@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ORES_CLI_HEAD: 1724ec9971b0193194a0c2056b309fa9a8ecc1c2
-  ORES_CLI_SOURCE_BLOB: c83c600a88088a241b9ed29e720088fcb9a24acb
+  ORES_CLI_HEAD: 274db13ce2283b88abdd4f03f4c58cabb3cb10f0
+  ORES_CLI_SOURCE_BLOB: afc3e8ebe506eab075e26c77660769ddf50b52d0
   ORES_CLI_MOD_BLOB: d280afc21200fdfa466aab53e6afb0a8359cf582
 
 jobs:
