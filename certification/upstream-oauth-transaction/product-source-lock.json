@@ -1,0 +1,14 @@
+{
+  "schema": "ores.test-org-exact-source-lock/v1",
+  "repository": "shared-auth/shared-auth-server.rs",
+  "pullRequest": 142,
+  "head": "35d6c5347ca1dd0ef694cf1eb6f5c183170a62b0",
+  "files": {
+    "src/upstream_oauth_transaction.rs": "d0171656cb3b85a9f4484c7574dbd3070ca1b98f",
+    "Cargo.toml": "2fd65dd9146204f845ef3c72fbf26037678a6ca3"
+  },
+  "mergeParents": [
+    "83e32e5fcfcacd72e51a95a1988a194ca5991e5d",
+    "3ab845a667ad537dfb45eab49012c55561ea6666"
+  ]
+}
