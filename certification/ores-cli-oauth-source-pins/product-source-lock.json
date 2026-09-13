@@ -2,9 +2,9 @@
   "schema": "ores.test-org-exact-source-lock/v1",
   "repository": "ORESoftware/ores-cli",
   "pullRequest": 279,
-  "head": "1724ec9971b0193194a0c2056b309fa9a8ecc1c2",
+  "head": "274db13ce2283b88abdd4f03f4c58cabb3cb10f0",
   "files": {
-    "src/audit/oauth_provider_test_source_pins.rs": "c83c600a88088a241b9ed29e720088fcb9a24acb",
+    "src/audit/oauth_provider_test_source_pins.rs": "afc3e8ebe506eab075e26c77660769ddf50b52d0",
     "src/audit/mod.rs": "d280afc21200fdfa466aab53e6afb0a8359cf582"
   }
 }
