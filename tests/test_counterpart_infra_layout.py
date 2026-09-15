@@ -11,7 +11,7 @@ SNAPSHOT = REPO_ROOT / "fixtures" / "infra-snapshot"
 LOCK_PATH = REPO_ROOT / "infra-source-lock.json"
 SOURCE_REPO = "shared-auth/shared-auth-infra"
 SOURCE_PR = 68
-SOURCE_SHA = "67b85c85a1909ccc05616c4fee8bf1c3890d1a43"
+SOURCE_SHA = "6423340552095a8d23080f84c1bfa939a6f47fad"
 ENVIRONMENTS = ("preview", "staging", "production")
 PROVIDER_NATIVE_NAMES = {"wrangler.toml", "wrangler.json", "wrangler.jsonc", "neon.ts"}
 
