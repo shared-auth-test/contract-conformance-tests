@@ -1,27 +1,57 @@
 import json
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import tomllib
 import unittest
 
-SOURCE_REPO = "https://github.com/shared-auth/shared-auth-infra.git"
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+SNAPSHOT = REPO_ROOT / "fixtures" / "infra-snapshot"
+LOCK_PATH = REPO_ROOT / "infra-source-lock.json"
+SOURCE_REPO = "shared-auth/shared-auth-infra"
+SOURCE_PR = 68
 SOURCE_SHA = "67b85c85a1909ccc05616c4fee8bf1c3890d1a43"
 ENVIRONMENTS = ("preview", "staging", "production")
+PROVIDER_NATIVE_NAMES = {"wrangler.toml", "wrangler.json", "wrangler.jsonc", "neon.ts"}
+
 
 def run(*args: str, cwd: pathlib.Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, cwd=cwd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
+
+class SourceLockTests(unittest.TestCase):
+    def test_snapshot_matches_exact_upstream_blobs(self) -> None:
+        lock = json.loads(LOCK_PATH.read_text())
+        self.assertEqual(lock["source_repo"], SOURCE_REPO)
+        self.assertEqual(lock["source_pr"], SOURCE_PR)
+        self.assertEqual(lock["source_head_sha"], SOURCE_SHA)
+        self.assertTrue(lock["files"])
+        for relative, expected_sha in lock["files"].items():
+            snapshot_file = SNAPSHOT / relative
+            self.assertTrue(snapshot_file.is_file(), relative)
+            actual_sha = run("git", "hash-object", str(snapshot_file), cwd=REPO_ROOT).stdout.strip()
+            self.assertEqual(actual_sha, expected_sha, relative)
+
+    def test_snapshot_tracks_only_environment_composition(self) -> None:
+        tracked = run("git", "ls-files", "fixtures/infra-snapshot/environments", cwd=REPO_ROOT).stdout.splitlines()
+        self.assertTrue(tracked)
+        prefix = pathlib.PurePosixPath("fixtures/infra-snapshot")
+        for tracked_path in tracked:
+            relative = pathlib.PurePosixPath(tracked_path).relative_to(prefix)
+            self.assertNotIn(relative.name, PROVIDER_NATIVE_NAMES, tracked_path)
+            self.assertNotIn("supabase", relative.parts, tracked_path)
+            self.assertFalse(relative.name.endswith(".tfstate"), tracked_path)
+            self.assertNotIn(".terraform", relative.parts, tracked_path)
+
+
+@unittest.skipUnless(shutil.which("terraform"), "Terraform is exercised by the dedicated infra counterpart workflow")
 class CounterpartInfraLayoutTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._tmp = tempfile.TemporaryDirectory(prefix="shared-auth-infra-contract-")
         cls.root = pathlib.Path(cls._tmp.name) / "infra"
-        cls.root.mkdir()
-        run("git", "init", "-q", cwd=cls.root)
-        run("git", "remote", "add", "origin", SOURCE_REPO, cwd=cls.root)
-        run("git", "fetch", "--depth=1", "origin", SOURCE_SHA, cwd=cls.root)
-        run("git", "checkout", "--detach", "FETCH_HEAD", cwd=cls.root)
+        shutil.copytree(SNAPSHOT, cls.root)
         cls.manifest = tomllib.loads((cls.root / ".ores-infra.toml").read_text())
 
     @classmethod
@@ -31,6 +61,8 @@ class CounterpartInfraLayoutTests(unittest.TestCase):
     def test_modules_first_provider_roots(self) -> None:
         self.assertEqual(self.manifest["schema_version"], 1)
         self.assertEqual(self.manifest["layout"], "modules")
+        self.assertEqual(self.manifest["modules_root"], "modules")
+        self.assertEqual(self.manifest["environments_root"], "environments")
         providers = self.manifest["providers"]
         self.assertEqual(providers["supabase"]["canonical_path"], "modules/supabase")
         self.assertEqual(providers["supabase"]["native_working_directory"], "modules")
@@ -51,6 +83,12 @@ class CounterpartInfraLayoutTests(unittest.TestCase):
             run("terraform", "init", "-backend=false", "-input=false", cwd=env_root)
             run("terraform", "validate", "-no-color", cwd=env_root)
 
+    def test_worker_shell_is_opt_in(self) -> None:
+        text = (self.root / "modules/cloudflare/terraform/worker-shell/main.tf").read_text()
+        self.assertIn('variable "enabled"', text)
+        self.assertIn("default = false", text)
+        self.assertIn("var.enabled ? 1 : 0", text)
+
     def test_durable_object_bindings_are_environment_complete(self) -> None:
         wrangler = json.loads((self.root / "modules/cloudflare/durable-coordinator/wrangler.jsonc").read_text())
         binding = wrangler["durable_objects"]["bindings"][0]
@@ -60,6 +98,7 @@ class CounterpartInfraLayoutTests(unittest.TestCase):
             env_binding = wrangler["env"][environment]["durable_objects"]["bindings"][0]
             self.assertEqual(env_binding["name"], binding["name"])
             self.assertEqual(env_binding["class_name"], class_name)
+
 
 if __name__ == "__main__":
     unittest.main()
