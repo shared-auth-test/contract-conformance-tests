@@ -50,5 +50,5 @@ module "cloudflare_worker_shell" {
   workers_dev                      = false
   preview_urls                     = false
   observability_head_sampling_rate = var.observability_head_sampling_rate
-  tags = ["managed-by:terraform", "project:${local.project}", "environment:${local.environment}"]
+  tags                             = ["managed-by:terraform", "project:${local.project}", "environment:${local.environment}"]
 }
