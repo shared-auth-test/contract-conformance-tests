@@ -1,0 +1,13 @@
+{
+  "source_repo": "shared-auth/shared-auth-infra",
+  "source_pr": 68,
+  "source_head_sha": "6423340552095a8d23080f84c1bfa939a6f47fad",
+  "files": {
+    ".ores-infra.toml": "41fd16206513690db4f4aaaa7e22c006fbea6960",
+    "environments/preview/main.tf": "6439f56013ae681d35fbb12352f62d4d62055f38",
+    "environments/staging/main.tf": "d086023809e063dadce67eed2582774cf38cbfbe",
+    "environments/production/main.tf": "b305e36e116b31a2b53af5881adb952f3344723b",
+    "modules/cloudflare/terraform/worker-shell/main.tf": "87ac73958af93ace844265522c75254b32bd4bbd",
+    "modules/cloudflare/durable-coordinator/wrangler.jsonc": "375dd24127be5b2dd68d486adce16a57f89eff7b"
+  }
+}
