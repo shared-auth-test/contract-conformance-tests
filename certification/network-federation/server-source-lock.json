@@ -1,0 +1,10 @@
+{
+  "schema": "ores.test-org-exact-source-lock/v1",
+  "repository": "shared-auth/shared-auth-server.rs",
+  "pullRequest": 156,
+  "head": "df6033dd7dba3b81b4e6c6c56de8f37b9675bc76",
+  "files": {
+    "db/network-federation.sql": "75b97b587d6d68065bc862f43a6323e8daa5f4f0",
+    "tests/network_federation_schema.rs": "73dda80d6c43b043b9cfaa53ae0ecae8ed805abf"
+  }
+}

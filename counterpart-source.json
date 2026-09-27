@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "status": "active",
+  "testOwner": {"login": "shared-auth-test", "id": 313181126, "type": "Organization"},
+  "productionOwner": {"login": "shared-auth", "id": 307325286, "type": "Organization"},
+  "governanceRepository": "shared-auth-test/.github",
+  "governancePath": "architecture/test-counterpart.json",
+  "scope": {"kind": "organization-current-tips", "includeArchived": false},
+  "policy": {"suffixInferenceAuthoritative": false, "bindExactDefaultBranchSha": true, "privateVisibilityFailsClosed": true}
+}

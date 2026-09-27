@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "shared-auth-coordinator",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-09-14",
+  "workers_dev": false,
+  "preview_urls": false,
+  "durable_objects": { "bindings": [{ "name": "COORDINATOR", "class_name": "SharedAuthCoordinator" }] },
+  "exports": { "SharedAuthCoordinator": { "type": "durable-object", "storage": "sqlite" } },
+  "env": {
+    "preview": { "name": "shared-auth-coordinator-preview", "workers_dev": false, "preview_urls": true, "durable_objects": { "bindings": [{ "name": "COORDINATOR", "class_name": "SharedAuthCoordinator" }] } },
+    "staging": { "name": "shared-auth-coordinator-staging", "workers_dev": false, "preview_urls": false, "durable_objects": { "bindings": [{ "name": "COORDINATOR", "class_name": "SharedAuthCoordinator" }] } },
+    "production": { "name": "shared-auth-coordinator-production", "workers_dev": false, "preview_urls": false, "durable_objects": { "bindings": [{ "name": "COORDINATOR", "class_name": "SharedAuthCoordinator" }] } }
+  }
+}
