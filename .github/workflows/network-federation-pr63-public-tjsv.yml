@@ -17,6 +17,7 @@ env:
   PRODUCT_HEAD: be30b24eabe813bd0165fde398677c45852ce71c
   TYPESPEC_BLOB: 5c422d4014468ddca41f16fd49a44bb3301a24d0
   TJSV_REV: 93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+  CROSS_REPO_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN || secrets.TEST_FLEET_GITHUB_TOKEN || secrets.ORES_CROSS_REPO_READ_TOKEN }}
 
 jobs:
   peer-authority:
@@ -30,12 +31,21 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      - name: Require private cross-org read credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CROSS_REPO_READ_TOKEN:-}" ]]; then
+            echo "::error title=Infrastructure blocked::No private cross-org read credential is configured (checked TEST_FLEET_READ_TOKEN, TEST_FLEET_GITHUB_TOKEN, ORES_CROSS_REPO_READ_TOKEN)."
+            exit 1
+          fi
+
       - name: Check out exact private interface candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: shared-auth/shared-auth-interfaces
           ref: ${{ env.PRODUCT_HEAD }}
-          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          token: ${{ env.CROSS_REPO_READ_TOKEN }}
           path: private-interfaces
           persist-credentials: false
           show-progress: false
