@@ -1,0 +1,19 @@
+name: shared_auth_ui_smoke_flutter
+description: Shared Auth login/signup smoke UI
+publish_to: none
+version: 0.0.1+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: 1.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
