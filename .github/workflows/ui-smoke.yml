@@ -62,4 +62,5 @@ jobs:
       - run: flutter create --platforms=web --project-name shared_auth_ui_smoke_flutter .
       - run: flutter pub get
       - run: flutter analyze
+      - run: flutter test
       - run: flutter build web --dart-define=SHARED_AUTH_BASE_URL=https://auth.ores-shared-auth.com
