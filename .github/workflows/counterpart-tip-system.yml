@@ -1,0 +1,40 @@
+name: counterpart-tip contract system
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: counterpart-tip-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  current-production-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.TEST_FLEET_GITHUB_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: { persist-credentials: false }
+      - name: Test 1 - counterpart organization exposes current repository tips
+        shell: bash
+        run: |
+          set -euo pipefail; primary="${GITHUB_REPOSITORY_OWNER%-test}"; test "$primary" != "$GITHUB_REPOSITORY_OWNER"
+          gh api --paginate "orgs/${primary}/repos?per_page=100&type=all" --jq '.[] | select(.archived == false) | [.name, .default_branch] | @tsv' > /tmp/primary-repos.tsv
+          test -s /tmp/primary-repos.tsv || { echo "No production repositories are visible for ${primary}. Configure TEST_FLEET_GITHUB_TOKEN for private cross-org coverage." >&2; exit 1; }
+          while IFS=$'\t' read -r repo branch; do test -n "$repo"; test -n "$branch"; sha="$(gh api "repos/${primary}/${repo}/commits/${branch}" --jq .sha)"; [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; done < /tmp/primary-repos.tsv
+      - name: Test 2 - current tips expose a first-class contract authority
+        shell: bash
+        run: |
+          set -euo pipefail; primary="${GITHUB_REPOSITORY_OWNER%-test}"; found=0; inspected=0
+          while IFS=$'\t' read -r repo branch; do
+            if [[ "$repo" =~ (interfaces|api|schema|contract|lib-core|infra) ]]; then inspected=$((inspected + 1)); sha="$(gh api "repos/${primary}/${repo}/commits/${branch}" --jq .sha)"; if gh api "repos/${primary}/${repo}/git/trees/${sha}?recursive=1" --jq '.tree[].path' | grep -Eq '(^|/)(\.ores-infra\.toml|\.zpkg\.toml|[^/]+\.tsp|[^/]+\.proto|[^/]+\.wit|openapi[^/]*\.(json|ya?ml)|[^/]*schema[^/]*\.json)$'; then echo "contract authority found in ${primary}/${repo}@${sha}"; found=1; break; fi; fi
+          done < /tmp/primary-repos.tsv
+          test "$inspected" -gt 0 || { echo "No contract-oriented production repository was discoverable in ${primary}." >&2; exit 1; }
+          test "$found" -eq 1 || { echo "No TypeSpec/JSON Schema/Protobuf/WIT/OpenAPI/.zpkg/.ores-infra authority found at current production tips." >&2; exit 1; }
+      - name: Test 3 - zed-pkg dependency tip is reachable
+        shell: bash
+        run: |
+          set -euo pipefail; branch="$(gh api repos/zed-pkg/zed-cli --jq .default_branch)"; sha="$(gh api "repos/zed-pkg/zed-cli/commits/${branch}" --jq .sha)"; [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; echo "zed-pkg/zed-cli current dependency tip: ${sha}"
