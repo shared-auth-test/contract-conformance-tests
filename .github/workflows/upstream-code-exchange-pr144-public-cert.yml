@@ -1,0 +1,131 @@
+name: Shared Auth upstream code exchange public exact-source certificate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/upstream-code-exchange-pr144-public-cert.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-code-exchange-pr144-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CERT_HEAD: b2a8a05c0cd1a586ec6564366c2553b3bd21c614
+  PRODUCT_HEAD: 03e5535d1321bf485f06f214dd40b0c2af6ba021
+  LIB_BLOB: 104a2842e4116c1e6cc6c1f74bf916f81b7971ca
+  FEDERATION_BLOB: 00ced8b06e5728eebc857f6d20164ce06b90b2fd
+  TRANSACTION_BLOB: d0171656cb3b85a9f4484c7574dbd3070ca1b98f
+  EXCHANGE_BLOB: fd88f40214d318b36b9bd53b39284a646dde23f5
+
+jobs:
+  exact-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact public certificate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out private certificate source at exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: shared-auth-test/oidc-provider-e2e
+          ref: ${{ env.CERT_HEAD }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          path: private-cert
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out exact private product head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: shared-auth/shared-auth-server.rs
+          ref: ${{ env.PRODUCT_HEAD }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          path: private-product
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prove certificate and product source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-cert rev-parse HEAD)" = "$CERT_HEAD"
+          test "$(git -C private-product rev-parse HEAD)" = "$PRODUCT_HEAD"
+          test "$(git -C private-product rev-parse HEAD:src/lib.rs)" = "$LIB_BLOB"
+          test "$(git -C private-product rev-parse HEAD:src/upstream_federation.rs)" = "$FEDERATION_BLOB"
+          test "$(git -C private-product rev-parse HEAD:src/upstream_oauth_transaction.rs)" = "$TRANSACTION_BLOB"
+          test "$(git -C private-product rev-parse HEAD:src/upstream_token_exchange.rs)" = "$EXCHANGE_BLOB"
+          test "$(git hash-object private-cert/certification/upstream-code-exchange-pr144/src/lib.rs)" = "$LIB_BLOB"
+          test "$(git hash-object private-cert/certification/upstream-code-exchange-pr144/src/upstream_federation.rs)" = "$FEDERATION_BLOB"
+          test "$(git hash-object private-cert/certification/upstream-code-exchange-pr144/src/upstream_oauth_transaction.rs)" = "$TRANSACTION_BLOB"
+          test "$(git hash-object private-cert/certification/upstream-code-exchange-pr144/src/upstream_token_exchange.rs)" = "$EXCHANGE_BLOB"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const lock = JSON.parse(readFileSync('private-cert/certification/upstream-code-exchange-pr144/source-pins.json', 'utf8'));
+          assert.equal(lock.sharedAuthServer.pullRequest, 144);
+          assert.equal(lock.sharedAuthServer.sha, process.env.PRODUCT_HEAD);
+          assert.equal(lock.sharedAuthServer.libBlob, process.env.LIB_BLOB);
+          assert.equal(lock.sharedAuthServer.federationBlob, process.env.FEDERATION_BLOB);
+          assert.equal(lock.sharedAuthServer.transactionBlob, process.env.TRANSACTION_BLOB);
+          assert.equal(lock.sharedAuthServer.exchangeBlob, process.env.EXCHANGE_BLOB);
+          assert.equal(lock.authorityModel.typespec, 'independently-authored-first-class');
+          assert.equal(lock.authorityModel.jsonSchemaDraft202012, 'independently-authored-first-class');
+          assert.equal(lock.authorityModel.generatedSchemaB, 'comparison-evidence-only');
+          assert.equal(lock.authorityModel.precedence, 'none');
+          assert.equal(lock.scope.tokenSetIsIdentity, false);
+          assert.equal(lock.scope.retainsRefreshToken, false);
+          assert.equal(lock.scope.followsTokenEndpointRedirects, false);
+          assert.equal(lock.scope.boundedResponseBytes, 65536);
+          assert.equal(lock.scope.environmentOnlyClientSecret, true);
+          NODE
+
+      - name: Install pinned Rust 1.95 toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
+
+      - name: Rustfmt exact product-derived certificate
+        run: cargo +1.95.0 fmt --manifest-path private-cert/certification/upstream-code-exchange-pr144/Cargo.toml -- --check
+
+      - name: Compile exact product-derived certificate
+        run: cargo +1.95.0 check --manifest-path private-cert/certification/upstream-code-exchange-pr144/Cargo.toml --all-targets
+
+      - name: Run debug regressions
+        run: cargo +1.95.0 test --manifest-path private-cert/certification/upstream-code-exchange-pr144/Cargo.toml
+
+      - name: Run optimized regressions
+        run: cargo +1.95.0 test --release --manifest-path private-cert/certification/upstream-code-exchange-pr144/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo +1.95.0 clippy --manifest-path private-cert/certification/upstream-code-exchange-pr144/Cargo.toml --all-targets -- -D warnings
+
+      - name: Assert exchange remains non-authoritative and bounded
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=private-cert/certification/upstream-code-exchange-pr144/src/upstream_token_exchange.rs
+          grep -Fq 'UpstreamBearerSecret' "$source"
+          grep -Fq '64 * 1024' "$source"
+          grep -Fq '.redirect(reqwest::redirect::Policy::none())' "$source"
+          grep -Fq '.chunk()' "$source"
+          ! grep -Fq 'refresh_token:' "$source"
+          ! grep -Fq 'create_session' "$source"
+          ! grep -Fq 'create_principal' "$source"
+          ! grep -Fq 'email' "$source"
+
+      - name: Prove private product and certificate were not rewritten
+        run: |
+          set -euo pipefail
+          git -C private-product diff --exit-code
+          git -C private-cert diff --exit-code
